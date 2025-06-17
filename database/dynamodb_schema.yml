@@ -1,0 +1,107 @@
+# DynamoDB Schema for PandasDB CRM Communication System
+# This file is for reference only - tables are created automatically via serverless.yml
+
+Tables:
+  leads:
+    description: "Core lead/prospect information"
+    partition_key: "id (String)"
+    attributes:
+      - id: "UUID primary key"
+      - name: "Lead name"
+      - metadata: "JSON metadata (source, contact info, etc.)"
+      - created_at: "ISO timestamp"
+      - updated_at: "ISO timestamp"
+
+  contact_methods:
+    description: "Various ways to contact a lead (email, phone, other)"
+    partition_key: "id (String)"
+    global_secondary_indexes:
+      - lead-id-index: "Query by lead_id"
+      - type-value-index: "Query by type#value composite"
+    attributes:
+      - id: "UUID primary key"
+      - lead_id: "Reference to leads table"
+      - type: "phone, email, other"
+      - value: "Actual contact value"
+      - type_value: "Composite key: type#value for uniqueness"
+      - created_at: "ISO timestamp"
+      - updated_at: "ISO timestamp"
+
+  contact_method_settings:
+    description: "Settings and preferences for contact methods"
+    partition_key: "id (String)"
+    global_secondary_indexes:
+      - contact-method-id-index: "Query by contact_method_id"
+    attributes:
+      - id: "UUID primary key"
+      - contact_method_id: "Reference to contact_methods table"
+      - is_primary: "Boolean - primary contact method of this type"
+      - is_active: "Boolean - whether this method is active"
+      - created_at: "ISO timestamp"
+      - updated_at: "ISO timestamp"
+
+  activities:
+    description: "All interactions and activities related to leads"
+    partition_key: "id (String)"
+    global_secondary_indexes:
+      - lead-id-created-at-index: "Query activities by lead, sorted by date"
+    attributes:
+      - id: "UUID primary key"
+      - lead_id: "Reference to leads table"
+      - contact_method_id: "Reference to contact_methods table (optional)"
+      - activity_type: "whatsapp, call, sms, videocall, email, other"
+      - status: "completed, scheduled, failed"
+      - direction: "inbound, outbound"
+      - scheduled_at: "ISO timestamp (optional)"
+      - completed_at: "ISO timestamp (optional)"
+      - created_at: "ISO timestamp for sorting"
+      - metadata: "JSON metadata (Twilio SID, profile name, etc.)"
+
+  activity_content:
+    description: "Detailed content for activities (messages, call notes, etc.)"
+    partition_key: "id (String)"
+    global_secondary_indexes:
+      - activity-id-index: "Query content by activity_id"
+    attributes:
+      - id: "UUID primary key"
+      - activity_id: "Reference to activities table"
+      - content_type: "whatsapp, email, call_notes, etc."
+      - content: "JSON content (leadMessage, assistantMessage, etc.)"
+      - created_at: "ISO timestamp"
+
+  spam_activities:
+    description: "Activities flagged as spam with tracking information"
+    partition_key: "id (String)"
+    global_secondary_indexes:
+      - lead-id-spam-date-index: "Query spam activities by lead and date range"
+    attributes:
+      - id: "UUID primary key"
+      - activity_id: "Reference to activities table"
+      - lead_id: "Reference to leads table"
+      - spam_date: "ISO timestamp for range queries"
+      - spam_reason: "Reason for flagging as spam"
+      - flagged_by: "bot, manual, etc."
+      - created_at: "ISO timestamp"
+
+# Key Design Patterns:
+
+# 1. Composite Keys:
+#    - type_value in contact_methods ensures uniqueness per contact type
+#    - Format: "phone#+1234567890" or "email#user@domain.com"
+
+# 2. Query Patterns:
+#    - Find contact by phone: Query type-value-index with "phone#+1234567890"
+#    - Get lead activities: Query lead-id-created-at-index by lead_id
+#    - Check spam count: Query lead-id-spam-date-index with date range
+#    - Get conversation history: Query activities + activity_content
+
+# 3. Access Patterns:
+#    - Webhook processing: phone lookup → lead lookup → spam check → activity creation
+#    - Conversation history: activities by lead → content by activity
+#    - Spam detection: count spam activities in last 30 days
+
+# 4. Cost Optimization:
+#    - Pay-per-request billing mode
+#    - Efficient GSI design for common queries
+#    - Minimal data duplication
+#    - Sparse indexes where appropriate

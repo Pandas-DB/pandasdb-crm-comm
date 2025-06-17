@@ -1,0 +1,442 @@
+- Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:Scan
+          Resource: 
+            - !GetAtt LeadsTable.Arn
+            - !GetAtt ContactMethodsTable.Arn
+            - !GetAtt ContactMethodSettingsTable.Arn
+            - !GetAtt ActivitiesTable.Arn
+            - !GetAtt ActivityContentTable.Arn
+            - !GetAtt SpamActivitiesTable.Arn
+            - !Sub "${LeadsTable.Arn}/index/*"
+            - !Sub "${ContactMethodsTable.Arn}/index/*"
+            - !Sub "${ActivitiesTable.Arn}/index/*"
+            - !Sub "${SpamActivitiesTable.Arn}/index/*"service: pandasdb-crm-comm
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.9
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  memorySize: 512
+  timeout: 30
+  
+  environment:
+    TWILIO_ACCOUNT_SID: ${env:TWILIO_ACCOUNT_SID}
+    TWILIO_AUTH_TOKEN: ${env:TWILIO_AUTH_TOKEN}
+    S3_KNOWLEDGE_BUCKET: !Ref KnowledgeBaseBucket
+    S3_KNOWLEDGE_FILE: knowledge/system_prompt.txt
+    LEADS_TABLE: !Ref LeadsTable
+    CONTACT_METHODS_TABLE: !Ref ContactMethodsTable
+    CONTACT_METHOD_SETTINGS_TABLE: !Ref ContactMethodSettingsTable
+    ACTIVITIES_TABLE: !Ref ActivitiesTable
+    ACTIVITY_CONTENT_TABLE: !Ref ActivityContentTable
+    SPAM_ACTIVITIES_TABLE: !Ref SpamActivitiesTable
+    
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: arn:aws:logs:*:*:*
+        - Effect: Allow
+          Action:
+            - bedrock:InvokeModel
+          Resource: 
+            - arn:aws:bedrock:*:*:foundation-model/anthropic.claude-3-haiku-20240307-v1:0
+            - arn:aws:bedrock:*:*:foundation-model/anthropic.claude-3-sonnet-20240229-v1:0
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+          Resource: 
+            - !Sub "${KnowledgeBaseBucket}/*"
+        - Effect: Allow
+          Action:
+            - states:StartExecution
+          Resource: 
+            - !Ref WhatsAppStateMachine
+
+functions:
+  checkContent:
+    handler: src/handlers/check_content.lambda_handler
+    name: ${self:service}-${self:provider.stage}-check-content
+    description: Check if WhatsApp message has content
+    
+  checkPhoneSpammer:
+    handler: src/handlers/check_phone_spammer.lambda_handler
+    name: ${self:service}-${self:provider.stage}-check-phone-spammer
+    description: Check phone exists and spammer status
+    
+  spamDetection:
+    handler: src/handlers/spam_detection.lambda_handler
+    name: ${self:service}-${self:provider.stage}-spam-detection
+    description: AI-powered spam detection using Bedrock
+    
+  handleSpam:
+    handler: src/handlers/handle_spam.lambda_handler
+    name: ${self:service}-${self:provider.stage}-handle-spam
+    description: Handle spam messages and responses
+    
+  handleNormalMessage:
+    handler: src/handlers/handle_normal_message.lambda_handler
+    name: ${self:service}-${self:provider.stage}-handle-normal-message
+    description: Handle normal messages with AI agent
+    
+  webhookHandler:
+    handler: src/handlers/webhook_handler.lambda_handler
+    name: ${self:service}-${self:provider.stage}-webhook-handler
+    description: Handle Twilio webhook and start Step Functions
+    events:
+      - http:
+          path: /webhook/whatsapp
+          method: post
+          cors: true
+    environment:
+      STATE_MACHINE_ARN: !Ref WhatsAppStateMachine
+
+stepFunctions:
+  stateMachines:
+    whatsappProcessor:
+      name: ${self:service}-${self:provider.stage}-processor
+      definition:
+        Comment: "WhatsApp Lead Bot Processing Pipeline"
+        StartAt: CheckMessageContent
+        States:
+          CheckMessageContent:
+            Type: Task
+            Resource: !GetAtt CheckContentLambdaFunction.Arn
+            Next: HasContent
+            Retry:
+              - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+                IntervalSeconds: 2
+                MaxAttempts: 3
+                BackoffRate: 2.0
+            Catch:
+              - ErrorEquals: ["States.ALL"]
+                Next: ProcessingFailed
+                ResultPath: "$.error"
+          
+          HasContent:
+            Type: Choice
+            Choices:
+              - Variable: "$.body.action"
+                StringEquals: "stop"
+                Next: MessageEmpty
+              - Variable: "$.body.action"
+                StringEquals: "continue"
+                Next: CheckPhoneAndSpammer
+            Default: ProcessingFailed
+          
+          MessageEmpty:
+            Type: Succeed
+            Result:
+              message: "Message had no content, processing stopped"
+          
+          CheckPhoneAndSpammer:
+            Type: Task
+            Resource: !GetAtt CheckPhoneSpammerLambdaFunction.Arn
+            Next: CheckIfExistingSpammer
+            Retry:
+              - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+                IntervalSeconds: 2
+                MaxAttempts: 3
+                BackoffRate: 2.0
+            Catch:
+              - ErrorEquals: ["States.ALL"]
+                Next: ProcessingFailed
+                ResultPath: "$.error"
+          
+          CheckIfExistingSpammer:
+            Type: Choice
+            Choices:
+              - Variable: "$.body.is_spammer"
+                BooleanEquals: true
+                Next: HandleSpamMessage
+            Default: SpamDetection
+          
+          SpamDetection:
+            Type: Task
+            Resource: !GetAtt SpamDetectionLambdaFunction.Arn
+            Next: IsSpamMessage
+            Retry:
+              - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+                IntervalSeconds: 2
+                MaxAttempts: 3
+                BackoffRate: 2.0
+            Catch:
+              - ErrorEquals: ["States.ALL"]
+                Next: HandleNormalMessage
+                Comment: "If spam detection fails, treat as normal message"
+          
+          IsSpamMessage:
+            Type: Choice
+            Choices:
+              - Variable: "$.body.is_spam"
+                BooleanEquals: true
+                Next: HandleSpamMessage
+            Default: HandleNormalMessage
+          
+          HandleSpamMessage:
+            Type: Task
+            Resource: !GetAtt HandleSpamLambdaFunction.Arn
+            Next: SpamProcessed
+            Retry:
+              - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+                IntervalSeconds: 2
+                MaxAttempts: 3
+                BackoffRate: 2.0
+            Catch:
+              - ErrorEquals: ["States.ALL"]
+                Next: ProcessingFailed
+                ResultPath: "$.error"
+          
+          HandleNormalMessage:
+            Type: Task
+            Resource: !GetAtt HandleNormalMessageLambdaFunction.Arn
+            Next: MessageProcessed
+            Retry:
+              - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+                IntervalSeconds: 2
+                MaxAttempts: 3
+                BackoffRate: 2.0
+            Catch:
+              - ErrorEquals: ["States.ALL"]
+                Next: ProcessingFailed
+                ResultPath: "$.error"
+          
+          SpamProcessed:
+            Type: Succeed
+            Result:
+              message: "Spam message processed successfully"
+          
+          MessageProcessed:
+            Type: Succeed
+            Result:
+              message: "Normal message processed successfully"
+          
+          ProcessingFailed:
+            Type: Fail
+            Cause: "Message processing failed"
+
+resources:
+  Resources:
+    # DynamoDB Tables
+    LeadsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-leads
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+    
+    ContactMethodsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-contact-methods
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: lead_id
+            AttributeType: S
+          - AttributeName: type_value
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: lead-id-index
+            KeySchema:
+              - AttributeName: lead_id
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+          - IndexName: type-value-index
+            KeySchema:
+              - AttributeName: type_value
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+    
+    ContactMethodSettingsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-contact-method-settings
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: contact_method_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: contact-method-id-index
+            KeySchema:
+              - AttributeName: contact_method_id
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+    
+    ActivitiesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-activities
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: lead_id
+            AttributeType: S
+          - AttributeName: created_at
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: lead-id-created-at-index
+            KeySchema:
+              - AttributeName: lead_id
+                KeyType: HASH
+              - AttributeName: created_at
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+    
+    ActivityContentTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-activity-content
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: activity_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: activity-id-index
+            KeySchema:
+              - AttributeName: activity_id
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+    
+    SpamActivitiesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-spam-activities
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: lead_id
+            AttributeType: S
+          - AttributeName: spam_date
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: lead-id-spam-date-index
+            KeySchema:
+              - AttributeName: lead_id
+                KeyType: HASH
+              - AttributeName: spam_date
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+    # S3 Bucket for Knowledge Base
+    KnowledgeBaseBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:service}-${self:provider.stage}-knowledge-base
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        VersioningConfiguration:
+          Status: Enabled
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
+    
+    # Step Functions State Machine
+    WhatsAppStateMachine:
+      Type: AWS::StepFunctions::StateMachine
+      Properties:
+        StateMachineName: ${self:service}-${self:provider.stage}-processor
+        RoleArn: !GetAtt StepFunctionsRole.Arn
+        DefinitionString: !Sub |
+          ${self:stepFunctions.stateMachines.whatsappProcessor.definition}
+    
+    # IAM Role for Step Functions
+    StepFunctionsRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: states.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: StepFunctionsExecutionPolicy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - lambda:InvokeFunction
+                  Resource:
+                    - !GetAtt CheckContentLambdaFunction.Arn
+                    - !GetAtt CheckPhoneSpammerLambdaFunction.Arn
+                    - !GetAtt SpamDetectionLambdaFunction.Arn
+                    - !GetAtt HandleSpamLambdaFunction.Arn
+                    - !GetAtt HandleNormalMessageLambdaFunction.Arn
+
+  Outputs:
+    WebhookUrl:
+      Description: "Webhook URL for Twilio"
+      Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/webhook/whatsapp"
+    
+    KnowledgeBaseBucket:
+      Description: "S3 Bucket for Knowledge Base"
+      Value: !Ref KnowledgeBaseBucket
+    
+    StateMachineArn:
+      Description: "Step Functions State Machine ARN"
+      Value: !Ref WhatsAppStateMachine
+
+plugins:
+  - serverless-step-functions
+  - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    slim: true
+    strip: false
