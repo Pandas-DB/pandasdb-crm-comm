@@ -494,98 +494,6 @@ git push origin feature/your-feature-name
 
 ---
 
-## 📚 Advanced Use Cases
-
-### **Multi-Language Support**
-
-```python
-# Extend system_prompt.txt for multiple languages
-def detect_language(message):
-    # Add language detection
-    pass
-
-def get_localized_prompt(language):
-    # Load language-specific prompts
-    pass
-```
-
-### **Custom Integrations**
-
-**CRM Integration**
-```python
-# Add webhook to sync with Salesforce/HubSpot
-def sync_to_crm(lead_data):
-    # Custom CRM sync logic
-    pass
-```
-
-**Analytics Integration**
-```python
-# Send events to Google Analytics
-def track_conversion(lead_id, event_type):
-    # Custom analytics logic
-    pass
-```
-
-### **Advanced Workflows**
-
-**Appointment Scheduling**
-- Integrate with Calendly/Google Calendar
-- Automatic meeting link generation
-- SMS/Email confirmation system
-
-**Product Catalog**
-- Dynamic product information lookup
-- Inventory checking integration
-- Price quote generation
-
-**Team Collaboration**
-- Slack notifications for qualified leads
-- Assignment routing based on territory
-- Lead scoring and prioritization
-
----
-
-## 🗺️ Roadmap
-
-### **🔥 Coming Soon (Q1 2025)**
-- [ ] **Multi-language Support**: Auto-detect and respond in user's language
-- [ ] **Advanced Analytics**: Charts, graphs, and detailed reporting
-- [ ] **CRM Integrations**: Native Salesforce, HubSpot, Pipedrive connectors
-- [ ] **Voice Messages**: AI transcription and response generation
-
-### **🚀 Future Features (Q2 2025)**
-- [ ] **Mobile App**: React Native backoffice app
-- [ ] **A/B Testing**: Response variation testing
-- [ ] **Lead Scoring**: ML-based lead qualification
-- [ ] **Team Management**: Multi-user access and permissions
-
-### **💡 Ideas & Research**
-- [ ] **Video Call Integration**: Automated scheduling with Zoom/Teams
-- [ ] **Sentiment Analysis**: Emotional tone detection and response
-- [ ] **Predictive Analytics**: Churn prediction and retention campaigns
-- [ ] **WhatsApp Catalog**: Product showcase integration
-
----
-
-## 🆘 Support & Community
-
-### **Getting Help**
-
-**Documentation**
-- 📖 [Full Documentation](./docs/) - Comprehensive guides
-- 🎥 [Video Tutorials](./docs/videos/) - Step-by-step walkthroughs  
-- 📋 [FAQ](./docs/faq.md) - Common questions and answers
-
-**Community**
-- 💬 [GitHub Discussions](https://github.com/your-repo/discussions) - Ask questions
-- 🐛 [Issues](https://github.com/your-repo/issues) - Report bugs
-- 💡 [Feature Requests](https://github.com/your-repo/issues/new?template=feature_request.md) - Suggest improvements
-
-**Professional Support**
-- 📧 **Email**: support@pandasdb.com
-- 💼 **Enterprise**: enterprise@pandasdb.com
-- 🔧 **Custom Development**: consulting@pandasdb.com
 
 ### **Contributing**
 
@@ -620,29 +528,10 @@ This software is provided "as is" without warranty. Users are responsible for co
 
 ---
 
-## 🎯 Ready to Transform Your WhatsApp Business?
-
-### **🚀 Start Your Free Trial**
-
-```bash
-git clone https://github.com/your-username/pandasdb-crm-comm.git
-cd pandasdb-crm-comm
-npm run deploy:dev
-```
-
-**What You Get:**
-- ⚡ **Instant Setup**: Live in 5 minutes
-- 🆓 **Free Tier**: 1,000 messages/month on AWS free tier
-- 🔧 **Full Control**: Complete source code access
-- 📊 **Analytics**: Comprehensive monitoring included
-- 🛡️ **Enterprise-Ready**: Production-tested architecture
-
 ### **💬 Questions?**
 
 We're here to help you succeed:
-- 📧 **Quick Questions**: hello@pandasdb.com
-- 📞 **Schedule Demo**: [calendly.com/pandasdb-demo](https://calendly.com/pandasdb-demo)
-- 💼 **Enterprise Sales**: enterprise@pandasdb.com
+- 📧 **Contact me**: https://www.linkedin.com/in/sergiortizrodriguez/
 
 ---
 
