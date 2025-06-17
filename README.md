@@ -17,7 +17,7 @@ Transform your WhatsApp business communications with intelligent automation. Thi
 - **Intelligent Spam Detection**: AI-powered filtering with 95%+ accuracy
 - **Automated Sales Agent**: Context-aware responses with conversation history
 - **Scalable Architecture**: Handle 1K to 1M+ messages per month
-- **Cost-Effective**: Pay only for what you use, starting at $6.63/month
+- **Cost-Effective**: Pay only for what you use
 - **Real-time Analytics**: Comprehensive monitoring and lead insights
 
 ### **⚡ Zero-Infrastructure Management**
