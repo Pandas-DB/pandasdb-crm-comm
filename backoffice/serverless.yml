@@ -1,0 +1,119 @@
+service: pandasdb-crm-comm-backoffice
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.9
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  
+custom:
+  mainStackName: pandasdb-crm-comm-${self:provider.stage}
+
+resources:
+  Resources:
+    # S3 Bucket for Backoffice Frontend
+    BackofficeBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:service}-${self:provider.stage}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: false
+          BlockPublicPolicy: false
+          IgnorePublicAcls: false
+          RestrictPublicBuckets: false
+        WebsiteConfiguration:
+          IndexDocument: index.html
+          ErrorDocument: index.html
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders: ['*']
+              AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+              AllowedOrigins: ['*']
+              MaxAge: 3600
+    
+    # S3 Bucket Policy for Public Read
+    BackofficeBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref BackofficeBucket
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Sid: PublicReadGetObject
+              Effect: Allow
+              Principal: "*"
+              Action: s3:GetObject
+              Resource: !Sub "${BackofficeBucket}/*"
+    
+    # CloudFront Origin Access Identity
+    BackofficeOriginAccessIdentity:
+      Type: AWS::CloudFront::OriginAccessIdentity
+      Properties:
+        OriginAccessIdentityConfig:
+          Comment: !Sub 'OAI for ${self:service}-${self:provider.stage}'
+    
+    # CloudFront Distribution for Global CDN
+    BackofficeDistribution:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          Enabled: true
+          Comment: !Sub 'CDN for ${self:service}-${self:provider.stage}'
+          DefaultRootObject: index.html
+          PriceClass: PriceClass_100  # Use only North America and Europe edge locations
+          
+          Origins:
+            - Id: BackofficeS3Origin
+              DomainName: !GetAtt BackofficeBucket.RegionalDomainName
+              S3OriginConfig:
+                OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${BackofficeOriginAccessIdentity}'
+          
+          DefaultCacheBehavior:
+            TargetOriginId: BackofficeS3Origin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # Managed-CachingDisabled
+            OriginRequestPolicyId: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf  # Managed-CORS-S3Origin
+          
+          CustomErrorResponses:
+            - ErrorCode: 404
+              ResponseCode: 200
+              ResponsePagePath: /index.html
+              ErrorCachingMinTTL: 300
+            - ErrorCode: 403
+              ResponseCode: 200
+              ResponsePagePath: /index.html
+              ErrorCachingMinTTL: 300
+          
+          HttpVersion: http2
+          IPV6Enabled: true
+
+  Outputs:
+    BackofficeUrl:
+      Description: "Backoffice Frontend URL"
+      Value: !Sub "https://${BackofficeDistribution.DomainName}"
+      Export:
+        Name: ${self:service}-${self:provider.stage}-BackofficeUrl
+    
+    BackofficeBucket:
+      Description: "S3 Bucket for Backoffice Frontend"
+      Value: !Ref BackofficeBucket
+      Export:
+        Name: ${self:service}-${self:provider.stage}-BackofficeBucket
+    
+    BackofficeDistributionId:
+      Description: "CloudFront Distribution ID"
+      Value: !Ref BackofficeDistribution
+      Export:
+        Name: ${self:service}-${self:provider.stage}-BackofficeDistributionId
+    
+    MainApiUrl:
+      Description: "Main API URL for backoffice to connect to"
+      Value: 
+        Fn::ImportValue: ${self:custom.mainStackName}-BackofficeApiUrl
+      Export:
+        Name: ${self:service}-${self:provider.stage}-MainApiUrl

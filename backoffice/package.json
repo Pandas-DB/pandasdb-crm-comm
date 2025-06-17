@@ -1,0 +1,28 @@
+{
+  "name": "pandasdb-crm-backoffice",
+  "version": "1.0.0",
+  "description": "Frontend backoffice for PandasDB CRM Communication System",
+  "scripts": {
+    "deploy-infra": "serverless deploy",
+    "deploy-infra:prod": "serverless deploy --stage prod",
+    "remove-infra": "serverless remove",
+    "deploy-frontend": "aws s3 sync frontend/ s3://$(aws cloudformation describe-stacks --stack-name pandasdb-crm-comm-backoffice-dev --query 'Stacks[0].Outputs[?OutputKey==`BackofficeBucket`].OutputValue' --output text) --delete",
+    "deploy-frontend:prod": "aws s3 sync frontend/ s3://$(aws cloudformation describe-stacks --stack-name pandasdb-crm-comm-backoffice-prod --query 'Stacks[0].Outputs[?OutputKey==`BackofficeBucket`].OutputValue' --output text) --delete",
+    "invalidate": "aws cloudfront create-invalidation --distribution-id $(aws cloudformation describe-stacks --stack-name pandasdb-crm-comm-backoffice-dev --query 'Stacks[0].Outputs[?OutputKey==`BackofficeDistributionId`].OutputValue' --output text) --paths '/*'",
+    "invalidate:prod": "aws cloudfront create-invalidation --distribution-id $(aws cloudformation describe-stacks --stack-name pandasdb-crm-comm-backoffice-prod --query 'Stacks[0].Outputs[?OutputKey==`BackofficeDistributionId`].OutputValue' --output text) --paths '/*'",
+    "deploy": "npm run deploy-frontend && npm run invalidate",
+    "deploy:prod": "npm run deploy-frontend:prod && npm run invalidate:prod",
+    "deploy-all": "npm run deploy-infra && npm run deploy",
+    "deploy-all:prod": "npm run deploy-infra:prod && npm run deploy:prod",
+    "serve": "python3 -m http.server 8080 --directory frontend",
+    "dev": "npm run serve",
+    "logs": "serverless logs -f",
+    "info": "serverless info"
+  },
+  "devDependencies": {
+    "serverless": "^3.38.0"
+  },
+  "keywords": ["crm", "backoffice", "whatsapp", "leads", "analytics"],
+  "author": "PandasDB Team",
+  "license": "MIT"
+}

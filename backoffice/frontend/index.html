@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PandasDB CRM - Backoffice</title>
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐼</text></svg>">
+</head>
+<body>
+    <div class="app">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="nav-brand">
+                <span class="logo">🐼</span>
+                <h1>PandasDB CRM</h1>
+            </div>
+            <div class="nav-menu">
+                <button class="nav-item active" data-tab="dashboard">📊 Dashboard</button>
+                <button class="nav-item" data-tab="leads">👥 Leads</button>
+                <button class="nav-item" data-tab="spam">🚫 Spam Monitor</button>
+                <button class="nav-item" data-tab="settings">⚙️ Settings</button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content active">
+                <div class="page-header">
+                    <h2>📊 Dashboard Analytics</h2>
+                    <button class="btn btn-primary" onclick="refreshDashboard()">
+                        <span class="refresh-icon">🔄</span> Refresh
+                    </button>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="totalLeads">-</div>
+                            <div class="stat-label">Total Leads</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">💬</div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="totalMessages">-</div>
+                            <div class="stat-label">Messages Today</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🚫</div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="spamPercentage">-</div>
+                            <div class="stat-label">Spam Percentage</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⚠️</div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="spamUsers">-</div>
+                            <div class="stat-label">Spam Users</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="section">
+                    <h3>📈 System Health</h3>
+                    <div class="health-indicators">
+                        <div class="health-item">
+                            <span class="health-status online"></span>
+                            <span>API Status</span>
+                        </div>
+                        <div class="health-item">
+                            <span class="health-status online"></span>
+                            <span>DynamoDB</span>
+                        </div>
+                        <div class="health-item">
+                            <span class="health-status online"></span>
+                            <span>Lambda Functions</span>
+                        </div>
+                        <div class="health-item">
+                            <span class="health-status online"></span>
+                            <span>Bedrock AI</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leads Tab -->
+            <div id="leads" class="tab-content">
+                <div class="page-header">
+                    <h2>👥 Lead Management</h2>
+                </div>
+
+                <!-- Lead Search -->
+                <div class="section">
+                    <h3>🔍 Lead Lookup</h3>
+                    <div class="search-container">
+                        <input type="text" id="leadSearchInput" placeholder="Enter Lead ID (UUID)" class="search-input">
+                        <button class="btn btn-primary" onclick="searchLead()">Search</button>
+                    </div>
+                    <div id="leadSearchResult" class="search-results"></div>
+                </div>
+            </div>
+
+            <!-- Spam Monitor Tab -->
+            <div id="spam" class="tab-content">
+                <div class="page-header">
+                    <h2>🚫 Spam Monitoring</h2>
+                </div>
+
+                <!-- Spam Tabs -->
+                <div class="spam-tabs">
+                    <button class="spam-tab active" data-spam-tab="activities">📋 Spam Activities</button>
+                    <button class="spam-tab" data-spam-tab="users">👤 Spam Users</button>
+                </div>
+
+                <!-- Spam Activities -->
+                <div id="spam-activities" class="spam-content active">
+                    <div class="section">
+                        <div class="section-header">
+                            <h3>📋 Recent Spam Activities</h3>
+                            <button class="btn btn-secondary" onclick="loadSpamActivities()">Reload</button>
+                        </div>
+                        <div id="spamActivitiesList" class="loading">Loading spam activities...</div>
+                    </div>
+                </div>
+
+                <!-- Spam Users -->
+                <div id="spam-users" class="spam-content">
+                    <div class="section">
+                        <div class="section-header">
+                            <h3>👤 Users Classified as Spammers</h3>
+                            <button class="btn btn-secondary" onclick="loadSpamUsers()">Reload</button>
+                        </div>
+                        <div id="spamUsersList" class="loading">Loading spam users...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings" class="tab-content">
+                <div class="page-header">
+                    <h2>⚙️ Settings</h2>
+                </div>
+
+                <div class="section">
+                    <h3>🔧 System Configuration</h3>
+                    <div class="config-item">
+                        <label>API Endpoint:</label>
+                        <input type="text" id="apiEndpoint" readonly class="config-input">
+                    </div>
+                    <div class="config-item">
+                        <label>Last Updated:</label>
+                        <span id="lastUpdated">-</span>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3>📊 Export Data</h3>
+                    <button class="btn btn-secondary" onclick="exportData('leads')">Export Leads</button>
+                    <button class="btn btn-secondary" onclick="exportData('activities')">Export Activities</button>
+                    <button class="btn btn-secondary" onclick="exportData('spam')">Export Spam Data</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Notifications -->
+        <div id="notifications" class="notifications"></div>
+    </div>
+
+    <script src="./script.js"></script>
+</body>
+</html>
