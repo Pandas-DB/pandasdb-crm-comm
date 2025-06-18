@@ -34,9 +34,16 @@ def lambda_handler(event, context):
             if field not in webhook_data:
                 logger.warning(f"Missing required field: {field}")
         
+        # Construct Step Functions ARN from name
+        state_machine_name = os.environ['STATE_MACHINE_NAME']
+        region = os.environ.get('AWS_DEFAULT_REGION', 'eu-west-1')
+        account_id = context.invoked_function_arn.split(':')[4]
+        state_machine_arn = f"arn:aws:states:{region}:{account_id}:stateMachine:{state_machine_name}"
+        
+        logger.info(f"Using State Machine ARN: {state_machine_arn}")
+        
         # Start Step Functions execution
         stepfunctions_client = boto3.client('stepfunctions')
-        state_machine_arn = os.environ['STATE_MACHINE_ARN']
         
         execution_input = {
             'body': webhook_data
