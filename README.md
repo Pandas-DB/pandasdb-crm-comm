@@ -122,6 +122,9 @@ npm install
 # 2. Configure environment
 cp .env.example .env
 # Edit .env with your Twilio credentials
+# alternatively open your terminal and set the variables in your shell:
+# export TWILIO_ACCOUNT_SID=your_actual_sid_here
+# export TWILIO_AUTH_TOKEN=your_actual_token_here
 
 # 3. Deploy to AWS
 npm run deploy:dev

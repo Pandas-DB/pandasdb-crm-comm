@@ -1,22 +1,4 @@
-- Effect: Allow
-          Action:
-            - dynamodb:GetItem
-            - dynamodb:PutItem
-            - dynamodb:UpdateItem
-            - dynamodb:DeleteItem
-            - dynamodb:Query
-            - dynamodb:Scan
-          Resource: 
-            - !GetAtt LeadsTable.Arn
-            - !GetAtt ContactMethodsTable.Arn
-            - !GetAtt ContactMethodSettingsTable.Arn
-            - !GetAtt ActivitiesTable.Arn
-            - !GetAtt ActivityContentTable.Arn
-            - !GetAtt SpamActivitiesTable.Arn
-            - !Sub "${LeadsTable.Arn}/index/*"
-            - !Sub "${ContactMethodsTable.Arn}/index/*"
-            - !Sub "${ActivitiesTable.Arn}/index/*"
-            - !Sub "${SpamActivitiesTable.Arn}/index/*"service: pandasdb-crm-comm
+service: pandasdb-crm-comm
 
 frameworkVersion: '3'
 
@@ -39,6 +21,7 @@ provider:
     ACTIVITIES_TABLE: !Ref ActivitiesTable
     ACTIVITY_CONTENT_TABLE: !Ref ActivityContentTable
     SPAM_ACTIVITIES_TABLE: !Ref SpamActivitiesTable
+    STATE_MACHINE_NAME: ${self:service}-${self:provider.stage}-processor
     
   iam:
     role:
@@ -59,12 +42,31 @@ provider:
           Action:
             - s3:GetObject
           Resource: 
-            - !Sub "${KnowledgeBaseBucket}/*"
+            - !Join ['', [!GetAtt KnowledgeBaseBucket.Arn, '/*']]
         - Effect: Allow
           Action:
             - states:StartExecution
           Resource: 
-            - !Ref WhatsAppStateMachine
+            - !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:${self:service}-${self:provider.stage}-processor"
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:Scan
+          Resource: 
+            - !GetAtt LeadsTable.Arn
+            - !GetAtt ContactMethodsTable.Arn
+            - !GetAtt ContactMethodSettingsTable.Arn
+            - !GetAtt ActivitiesTable.Arn
+            - !GetAtt ActivityContentTable.Arn
+            - !GetAtt SpamActivitiesTable.Arn
+            - !Sub "${LeadsTable.Arn}/index/*"
+            - !Sub "${ContactMethodsTable.Arn}/index/*"
+            - !Sub "${ActivitiesTable.Arn}/index/*"
+            - !Sub "${SpamActivitiesTable.Arn}/index/*"
 
 functions:
   checkContent:
@@ -101,132 +103,6 @@ functions:
           path: /webhook/whatsapp
           method: post
           cors: true
-    environment:
-      STATE_MACHINE_ARN: !Ref WhatsAppStateMachine
-
-stepFunctions:
-  stateMachines:
-    whatsappProcessor:
-      name: ${self:service}-${self:provider.stage}-processor
-      definition:
-        Comment: "WhatsApp Lead Bot Processing Pipeline"
-        StartAt: CheckMessageContent
-        States:
-          CheckMessageContent:
-            Type: Task
-            Resource: !GetAtt CheckContentLambdaFunction.Arn
-            Next: HasContent
-            Retry:
-              - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
-                IntervalSeconds: 2
-                MaxAttempts: 3
-                BackoffRate: 2.0
-            Catch:
-              - ErrorEquals: ["States.ALL"]
-                Next: ProcessingFailed
-                ResultPath: "$.error"
-          
-          HasContent:
-            Type: Choice
-            Choices:
-              - Variable: "$.body.action"
-                StringEquals: "stop"
-                Next: MessageEmpty
-              - Variable: "$.body.action"
-                StringEquals: "continue"
-                Next: CheckPhoneAndSpammer
-            Default: ProcessingFailed
-          
-          MessageEmpty:
-            Type: Succeed
-            Result:
-              message: "Message had no content, processing stopped"
-          
-          CheckPhoneAndSpammer:
-            Type: Task
-            Resource: !GetAtt CheckPhoneSpammerLambdaFunction.Arn
-            Next: CheckIfExistingSpammer
-            Retry:
-              - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
-                IntervalSeconds: 2
-                MaxAttempts: 3
-                BackoffRate: 2.0
-            Catch:
-              - ErrorEquals: ["States.ALL"]
-                Next: ProcessingFailed
-                ResultPath: "$.error"
-          
-          CheckIfExistingSpammer:
-            Type: Choice
-            Choices:
-              - Variable: "$.body.is_spammer"
-                BooleanEquals: true
-                Next: HandleSpamMessage
-            Default: SpamDetection
-          
-          SpamDetection:
-            Type: Task
-            Resource: !GetAtt SpamDetectionLambdaFunction.Arn
-            Next: IsSpamMessage
-            Retry:
-              - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
-                IntervalSeconds: 2
-                MaxAttempts: 3
-                BackoffRate: 2.0
-            Catch:
-              - ErrorEquals: ["States.ALL"]
-                Next: HandleNormalMessage
-                Comment: "If spam detection fails, treat as normal message"
-          
-          IsSpamMessage:
-            Type: Choice
-            Choices:
-              - Variable: "$.body.is_spam"
-                BooleanEquals: true
-                Next: HandleSpamMessage
-            Default: HandleNormalMessage
-          
-          HandleSpamMessage:
-            Type: Task
-            Resource: !GetAtt HandleSpamLambdaFunction.Arn
-            Next: SpamProcessed
-            Retry:
-              - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
-                IntervalSeconds: 2
-                MaxAttempts: 3
-                BackoffRate: 2.0
-            Catch:
-              - ErrorEquals: ["States.ALL"]
-                Next: ProcessingFailed
-                ResultPath: "$.error"
-          
-          HandleNormalMessage:
-            Type: Task
-            Resource: !GetAtt HandleNormalMessageLambdaFunction.Arn
-            Next: MessageProcessed
-            Retry:
-              - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
-                IntervalSeconds: 2
-                MaxAttempts: 3
-                BackoffRate: 2.0
-            Catch:
-              - ErrorEquals: ["States.ALL"]
-                Next: ProcessingFailed
-                ResultPath: "$.error"
-          
-          SpamProcessed:
-            Type: Succeed
-            Result:
-              message: "Spam message processed successfully"
-          
-          MessageProcessed:
-            Type: Succeed
-            Result:
-              message: "Normal message processed successfully"
-          
-          ProcessingFailed:
-            Type: Fail
-            Cause: "Message processing failed"
 
 resources:
   Resources:
@@ -370,7 +246,6 @@ resources:
     KnowledgeBaseBucket:
       Type: AWS::S3::Bucket
       Properties:
-        BucketName: ${self:service}-${self:provider.stage}-knowledge-base
         PublicAccessBlockConfiguration:
           BlockPublicAcls: true
           BlockPublicPolicy: true
@@ -382,15 +257,6 @@ resources:
           ServerSideEncryptionConfiguration:
             - ServerSideEncryptionByDefault:
                 SSEAlgorithm: AES256
-    
-    # Step Functions State Machine
-    WhatsAppStateMachine:
-      Type: AWS::StepFunctions::StateMachine
-      Properties:
-        StateMachineName: ${self:service}-${self:provider.stage}-processor
-        RoleArn: !GetAtt StepFunctionsRole.Arn
-        DefinitionString: !Sub |
-          ${self:stepFunctions.stateMachines.whatsappProcessor.definition}
     
     # IAM Role for Step Functions
     StepFunctionsRole:
@@ -418,6 +284,126 @@ resources:
                     - !GetAtt HandleSpamLambdaFunction.Arn
                     - !GetAtt HandleNormalMessageLambdaFunction.Arn
 
+    # Step Functions State Machine
+    WhatsAppStateMachine:
+      Type: AWS::StepFunctions::StateMachine
+      Properties:
+        StateMachineName: ${self:service}-${self:provider.stage}-processor
+        RoleArn: !GetAtt StepFunctionsRole.Arn
+        Definition:
+          Comment: "WhatsApp Lead Bot Processing Pipeline"
+          StartAt: CheckMessageContent
+          States:
+            CheckMessageContent:
+              Type: Task
+              Resource: !GetAtt CheckContentLambdaFunction.Arn
+              Next: HasContent
+              Retry:
+                - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+                  IntervalSeconds: 2
+                  MaxAttempts: 3
+                  BackoffRate: 2.0
+              Catch:
+                - ErrorEquals: ["States.ALL"]
+                  Next: ProcessingFailed
+                  ResultPath: "$.error"
+            
+            HasContent:
+              Type: Choice
+              Choices:
+                - Variable: "$.body.action"
+                  StringEquals: "stop"
+                  Next: MessageEmpty
+                - Variable: "$.body.action"
+                  StringEquals: "continue"
+                  Next: CheckPhoneAndSpammer
+              Default: ProcessingFailed
+            
+            MessageEmpty:
+              Type: Succeed
+            
+            CheckPhoneAndSpammer:
+              Type: Task
+              Resource: !GetAtt CheckPhoneSpammerLambdaFunction.Arn
+              Next: CheckIfExistingSpammer
+              Retry:
+                - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+                  IntervalSeconds: 2
+                  MaxAttempts: 3
+                  BackoffRate: 2.0
+              Catch:
+                - ErrorEquals: ["States.ALL"]
+                  Next: ProcessingFailed
+                  ResultPath: "$.error"
+            
+            CheckIfExistingSpammer:
+              Type: Choice
+              Choices:
+                - Variable: "$.body.is_spammer"
+                  BooleanEquals: true
+                  Next: HandleSpamMessage
+              Default: SpamDetection
+            
+            SpamDetection:
+              Type: Task
+              Resource: !GetAtt SpamDetectionLambdaFunction.Arn
+              Next: IsSpamMessage
+              Retry:
+                - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+                  IntervalSeconds: 2
+                  MaxAttempts: 3
+                  BackoffRate: 2.0
+              Catch:
+                - ErrorEquals: ["States.ALL"]
+                  Next: HandleNormalMessage
+                  Comment: "If spam detection fails, treat as normal message"
+            
+            IsSpamMessage:
+              Type: Choice
+              Choices:
+                - Variable: "$.body.is_spam"
+                  BooleanEquals: true
+                  Next: HandleSpamMessage
+              Default: HandleNormalMessage
+            
+            HandleSpamMessage:
+              Type: Task
+              Resource: !GetAtt HandleSpamLambdaFunction.Arn
+              Next: SpamProcessed
+              Retry:
+                - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+                  IntervalSeconds: 2
+                  MaxAttempts: 3
+                  BackoffRate: 2.0
+              Catch:
+                - ErrorEquals: ["States.ALL"]
+                  Next: ProcessingFailed
+                  ResultPath: "$.error"
+            
+            HandleNormalMessage:
+              Type: Task
+              Resource: !GetAtt HandleNormalMessageLambdaFunction.Arn
+              Next: MessageProcessed
+              Retry:
+                - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+                  IntervalSeconds: 2
+                  MaxAttempts: 3
+                  BackoffRate: 2.0
+              Catch:
+                - ErrorEquals: ["States.ALL"]
+                  Next: ProcessingFailed
+                  ResultPath: "$.error"
+            
+            SpamProcessed:
+              Type: Succeed
+            
+            MessageProcessed:
+              Type: Succeed
+            
+            ProcessingFailed:
+              Type: Fail
+              Cause: "Message processing failed"
+
   Outputs:
     WebhookUrl:
       Description: "Webhook URL for Twilio"
@@ -432,6 +418,7 @@ resources:
       Value: !Ref WhatsAppStateMachine
 
 plugins:
+  - serverless-dotenv-plugin
   - serverless-step-functions
   - serverless-python-requirements
 
