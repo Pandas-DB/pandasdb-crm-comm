@@ -1,6 +1,7 @@
 import json
 import logging
 import boto3
+import os
 from botocore.exceptions import ClientError
 
 logger = logging.getLogger()
@@ -37,10 +38,13 @@ def lambda_handler(event, context):
                 }
             }
         
-        # Initialize Bedrock client
+        # Initialize Bedrock client - USE CORRECT REGION!
+        # Get region from environment or default to eu-west-1
+        aws_region = os.environ.get('AWS_REGION', 'eu-west-1')
+        
         bedrock_runtime = boto3.client(
             service_name='bedrock-runtime',
-            region_name='us-east-1'  # Change to your preferred region
+            region_name=aws_region  # ✅ NOW USING CORRECT REGION
         )
         
         # Prepare the prompt for spam detection
@@ -79,7 +83,7 @@ def lambda_handler(event, context):
         # Call Bedrock
         response = bedrock_runtime.invoke_model(
             body=json.dumps(body),
-            modelId='anthropic.claude-3-haiku-20240307-v1:0',  # Change model as needed
+            modelId='anthropic.claude-3-haiku-20240307-v1:0',
             accept='application/json',
             contentType='application/json'
         )

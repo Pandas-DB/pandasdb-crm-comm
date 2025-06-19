@@ -55,7 +55,7 @@ def lambda_handler(event, context):
         # Initialize Bedrock client
         bedrock_runtime = boto3.client(
             service_name='bedrock-runtime',
-            region_name='us-east-1'
+            region_name=os.environ.get('AWS_REGION', 'eu-west-1')
         )
         
         # Load system prompt from S3 or use default
