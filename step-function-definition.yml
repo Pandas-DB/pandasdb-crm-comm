@@ -1,0 +1,112 @@
+Comment: "WhatsApp Lead Bot Processing Pipeline"
+StartAt: CheckMessageContent
+States:
+  CheckMessageContent:
+    Type: Task
+    Resource: !GetAtt CheckContentLambdaFunction.Arn
+    Next: HasContent
+    Retry:
+      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+        IntervalSeconds: 2
+        MaxAttempts: 3
+        BackoffRate: 2.0
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: ProcessingFailed
+        ResultPath: "$.error"
+  
+  HasContent:
+    Type: Choice
+    Choices:
+      - Variable: "$.body.action"
+        StringEquals: "stop"
+        Next: MessageEmpty
+      - Variable: "$.body.action"
+        StringEquals: "continue"
+        Next: CheckPhoneAndSpammer
+    Default: ProcessingFailed
+  
+  MessageEmpty:
+    Type: Succeed
+  
+  CheckPhoneAndSpammer:
+    Type: Task
+    Resource: !GetAtt CheckPhoneSpammerLambdaFunction.Arn
+    Next: CheckIfExistingSpammer
+    Retry:
+      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+        IntervalSeconds: 2
+        MaxAttempts: 3
+        BackoffRate: 2.0
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: ProcessingFailed
+        ResultPath: "$.error"
+  
+  CheckIfExistingSpammer:
+    Type: Choice
+    Choices:
+      - Variable: "$.body.is_spammer"
+        BooleanEquals: true
+        Next: HandleSpamMessage
+    Default: SpamDetection
+  
+  SpamDetection:
+    Type: Task
+    Resource: !GetAtt SpamDetectionLambdaFunction.Arn
+    Next: IsSpamMessage
+    Retry:
+      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+        IntervalSeconds: 2
+        MaxAttempts: 3
+        BackoffRate: 2.0
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: HandleNormalMessage
+        Comment: "If spam detection fails, treat as normal message"
+  
+  IsSpamMessage:
+    Type: Choice
+    Choices:
+      - Variable: "$.body.is_spam"
+        BooleanEquals: true
+        Next: HandleSpamMessage
+    Default: HandleNormalMessage
+  
+  HandleSpamMessage:
+    Type: Task
+    Resource: !GetAtt HandleSpamLambdaFunction.Arn
+    Next: SpamProcessed
+    Retry:
+      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+        IntervalSeconds: 2
+        MaxAttempts: 3
+        BackoffRate: 2.0
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: ProcessingFailed
+        ResultPath: "$.error"
+  
+  HandleNormalMessage:
+    Type: Task
+    Resource: !GetAtt HandleNormalMessageLambdaFunction.Arn
+    Next: MessageProcessed
+    Retry:
+      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+        IntervalSeconds: 2
+        MaxAttempts: 3
+        BackoffRate: 2.0
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: ProcessingFailed
+        ResultPath: "$.error"
+  
+  SpamProcessed:
+    Type: Succeed
+  
+  MessageProcessed:
+    Type: Succeed
+  
+  ProcessingFailed:
+    Type: Fail
+    Cause: "Message processing failed"

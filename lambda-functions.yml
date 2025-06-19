@@ -1,0 +1,35 @@
+checkContent:
+  handler: src/handlers/check_content.lambda_handler
+  name: ${self:service}-${self:provider.stage}-check-content
+  description: Check if WhatsApp message has content
+  
+checkPhoneSpammer:
+  handler: src/handlers/check_phone_spammer.lambda_handler
+  name: ${self:service}-${self:provider.stage}-check-phone-spammer
+  description: Check phone exists and spammer status
+  
+spamDetection:
+  handler: src/handlers/spam_detection.lambda_handler
+  name: ${self:service}-${self:provider.stage}-spam-detection
+  description: AI-powered spam detection using Bedrock
+  
+handleSpam:
+  handler: src/handlers/handle_spam.lambda_handler
+  name: ${self:service}-${self:provider.stage}-handle-spam
+  description: Handle spam messages and responses
+  
+handleNormalMessage:
+  handler: src/handlers/handle_normal_message.lambda_handler
+  name: ${self:service}-${self:provider.stage}-handle-normal-message
+  description: Handle normal messages with AI agent
+  
+webhookHandler:
+  handler: src/handlers/webhook_handler.lambda_handler
+  reservedConcurrency: 10  # Max 10 concurrent executions
+  name: ${self:service}-${self:provider.stage}-webhook-handler
+  description: Handle Twilio webhook and start Step Functions
+  events:
+    - http:
+        path: /webhook/whatsapp
+        method: post
+        cors: true

@@ -11,6 +11,86 @@ Transform your WhatsApp business communications with intelligent automation. Thi
 
 ---
 
+## 📁 Repository Structure
+
+```
+pandasdb-crm-comm/
+├── serverless.yml                    # Main configuration (infrastructure, IAM, resources)
+├── lambda-functions.yml              # Lambda function definitions
+├── step-function-definition.yml      # Step Functions workflow
+├── package.json                      # Node.js dependencies and scripts
+├── requirements.txt                  # Python dependencies
+├── .env.example                      # Environment variables template
+├── src/handlers/                     # Lambda function source code
+│   ├── webhook_handler.py
+│   ├── check_content.py
+│   ├── check_phone_spammer.py
+│   ├── spam_detection.py
+│   ├── handle_spam.py
+│   └── handle_normal_message.py
+├── knowledge/
+│   └── system_prompt.txt             # AI knowledge base
+├── database/
+│   └── dynamodb_schema.yml           # Database schema documentation
+└── backoffice/                       # Optional monitoring interface
+    ├── serverless.yml
+    ├── frontend/
+    ├── api/
+    └── scripts/
+```
+
+---
+
+## 🔧 Modifying Lambda Functions & Workflow
+
+### **Adding a New Lambda Function**
+
+1. **Create the handler**: Add new Python file in `src/handlers/`
+2. **Update lambda-functions.yml**: Add function definition
+   ```yaml
+   newFunction:
+     handler: src/handlers/new_function.lambda_handler
+     name: ${self:service}-${self:provider.stage}-new-function
+     description: Description of new function
+   ```
+3. **Update IAM permissions** (if needed): Add resources to `serverless.yml`
+4. **Update Step Function workflow** (if needed): Modify `step-function-definition.yml`
+
+### **Removing a Lambda Function**
+
+1. **Remove from lambda-functions.yml**: Delete the function definition
+2. **Update Step Function workflow**: Remove references in `step-function-definition.yml`
+3. **Remove handler file**: Delete from `src/handlers/`
+4. **Clean up IAM permissions**: Remove unused resources from `serverless.yml`
+
+### **Modifying the Step Function Workflow**
+
+Edit `step-function-definition.yml` to:
+- **Add new states**: Insert new Task, Choice, or other state types
+- **Change flow logic**: Modify Choice conditions or state transitions
+- **Update error handling**: Add/modify Retry and Catch blocks
+- **Add parallel execution**: Use Parallel states for concurrent processing
+
+**Example - Adding a new step:**
+```yaml
+# In step-function-definition.yml
+NewProcessingStep:
+  Type: Task
+  Resource: !GetAtt NewFunctionLambdaFunction.Arn
+  Next: ExistingNextStep
+  Retry:
+    - ErrorEquals: ["Lambda.ServiceException"]
+      IntervalSeconds: 2
+      MaxAttempts: 3
+```
+
+### **Important Notes**
+- Always update both the Lambda definition AND the Step Function workflow when adding/removing functions
+- Lambda function names in Step Functions use the format: `{FunctionName}LambdaFunction.Arn`
+- Test changes in dev environment before production: `npm run deploy:dev`
+
+---
+
 ## 🌟 Why PandasDB CRM?
 
 ### **🚀 Production-Ready Features**
@@ -343,7 +423,7 @@ spam_threshold = 0.7
 Your webhook endpoint has built-in protection against abuse and excessive requests:
 
 ~~~yaml
-# Current limits in serverless.yml
+# Current limits in lambda-functions.yml
 webhookHandler:
  reservedConcurrency: 10    # Max 10 concurrent Lambda executions
  events:
