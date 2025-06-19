@@ -336,6 +336,60 @@ spam_threshold = 0.7
 
 ---
 
+## 🚦 API Rate Limiting & Protection
+
+### **Current Protection Settings**
+
+Your webhook endpoint has built-in protection against abuse and excessive requests:
+
+~~~yaml
+# Current limits in serverless.yml
+webhookHandler:
+ reservedConcurrency: 10    # Max 10 concurrent Lambda executions
+ events:
+   - http:
+       throttle:
+         rate: 10           # 10 requests per second
+         burst: 20          # 20 concurrent requests max
+~~~
+
+### **Cost Protection Analysis**
+
+With these limits, the **maximum daily cost** from malicious attacks is capped at approximately **$3.91/day** (~$117/month), as invalid requests are rejected quickly by Twilio signature validation before triggering expensive downstream services.
+
+### **Customizing Rate Limits**
+
+Modify `lambda-functions.yml` to adjust protection levels:
+
+~~~yaml
+webhookHandler:
+ handler: src/handlers/webhook_handler.lambda_handler
+ reservedConcurrency: 50    # Increase for higher traffic
+ events:
+   - http:
+       throttle:
+         rate: 100          # Requests per second
+         burst: 200         # Concurrent request burst
+~~~
+
+### **Recommended Settings by Usage**
+
+| Usage Level | Rate (req/sec) | Burst | Concurrency | Use Case |
+|-------------|----------------|-------|-------------|----------|
+| **Development** | 10 | 20 | 10 | Testing and small deployments |
+| **Small Business** | 50 | 100 | 25 | Up to 1K messages/day |
+| **Medium Business** | 100 | 200 | 50 | Up to 10K messages/day |
+| **Enterprise** | 500 | 1000 | 100 | High-volume production |
+
+### **Security Features**
+
+- **Twilio Signature Validation**: Rejects non-Twilio requests
+- **API Gateway Rate Limiting**: Prevents traffic spikes
+- **Lambda Concurrency Limits**: Controls resource usage
+- **CloudWatch Monitoring**: Tracks unusual patterns
+
+**⚠️ Important**: After changing limits, redeploy with `npm run deploy:dev`
+
 ## 🔒 Security & Compliance
 
 ### **Data Protection**
