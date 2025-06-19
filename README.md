@@ -15,19 +15,21 @@ Transform your WhatsApp business communications with intelligent automation. Thi
 
 ### **🎯 Getting Started**
 - [Why PandasDB CRM?](#-why-pandasdb-crm) - Key benefits and business impact
-- [System Architecture](#️-system-architecture) - High-level technical overview
-- [Transparent Pricing](#-transparent-pricing) - Cost breakdown and estimates
 - [Quick Start](#-quick-start) - 5-minute deployment guide
+- [Transparent Costs](#-transparent-costs) - Cost breakdown and estimates
+
+### **⚙️ Advanced Usage**
+- [Configuration & Customization](#-configuration--customization) - Environment setup
+- [API Rate Limiting & Protection](#-api-rate-limiting--protection) - Security measures
+- [Modifying Lambda Functions & Workflow](#-modifying-lambda-functions--workflow) - Development guide
 
 ### **🏗️ Project Structure & Development**
 - [Repository Structure](#-repository-structure) - File organization
-- [Modifying Lambda Functions & Workflow](#-modifying-lambda-functions--workflow) - Development guide
-- [Configuration & Customization](#-configuration--customization) - Environment setup
+- [System Architecture](#️-system-architecture) - High-level technical overview
 - [Testing & Development](#-testing--development) - Local development workflow
 
 ### **🔧 Features & Technical Details**
 - [Features Deep Dive](#-features-deep-dive) - AI spam detection, sales agent, WhatsApp integration
-- [API Rate Limiting & Protection](#-api-rate-limiting--protection) - Security measures
 - [Security & Compliance](#-security--compliance) - Data protection and compliance
 - [Optional Backoffice Interface](#️-optional-backoffice-interface) - Web monitoring dashboard
 
@@ -58,65 +60,6 @@ Transform your WhatsApp business communications with intelligent automation. Thi
 - **24/7 Availability**: Never miss a potential customer
 - **Spam Protection**: Keep your team focused on real prospects
 - **Sales Automation**: Intelligent responses that drive conversions
-
----
-
-## 🏗️ System Architecture
-
-```mermaid
-graph TB
-    A[WhatsApp User] -->|Message| B[Twilio Webhook]
-    B --> C[API Gateway]
-    C --> D[Step Functions]
-    
-    D --> E[Content Check]
-    E --> F[Phone Lookup]
-    F --> G[Spam Detection]
-    
-    G -->|Clean| H[AI Sales Agent]
-    G -->|Spam| I[Spam Handler]
-    
-    H --> J[Response Generation]
-    I --> K[Block/Warning]
-    
-    J --> L[Twilio Response]
-    K --> L
-    
-    F --> M[(DynamoDB)]
-    H --> N[Bedrock AI]
-    N --> O[S3 Knowledge Base]
-    
-    P[Optional Backoffice] --> Q[CloudFront CDN]
-    Q --> R[Real-time Analytics]
-    
-    style A fill:#25D366
-    style N fill:#FF9900
-    style M fill:#3F48CC
-    style P fill:#9D4EDD
-```
-
-### **Core Components**
-- **🔄 Step Functions**: Workflow orchestration
-- **⚡ Lambda Functions**: Serverless compute
-- **💾 DynamoDB**: NoSQL database for leads and activities
-- **🧠 Bedrock AI**: Claude 3 for spam detection and sales responses
-- **📱 Twilio Integration**: WhatsApp Business API
-- **📊 Optional Backoffice**: Web-based monitoring interface
-
----
-
-## 💰 Transparent Pricing
-
-### **Monthly Cost by Usage Volume**
-
-| Volume | Users | AWS Services | Twilio WhatsApp | **Total Cost** | Cost/User | Cost/Message |
-|--------|-------|--------------|-----------------|----------------|-----------|--------------|
-| **1K messages** | 200 | $1.95 | $4.68 | **$6.63** | $0.033 | $0.0066 |
-| **10K messages** | 2K | $7.81 | $46.75 | **$54.56** | $0.027 | $0.0055 |
-| **100K messages** | 20K | $52.15 | $467.50 | **$519.65** | $0.026 | $0.0052 |
-| **1M messages** | 200K | $485.20 | $4,675.00 | **$5,160.20** | $0.026 | $0.0052 |
-
-> **💡 Pro Tip**: 85% of costs come from Twilio WhatsApp messaging. AWS infrastructure scales efficiently with excellent cost-per-message economics.
 
 ---
 
@@ -165,33 +108,136 @@ cd backoffice
 
 ---
 
-## 📁 Repository Structure
+## 💰 Transparent Costs
 
+### **Monthly Cost by Usage Volume**
+
+| Volume | Users | AWS Services | Twilio WhatsApp | **Total Cost** | Cost/User | Cost/Message |
+|--------|-------|--------------|-----------------|----------------|-----------|--------------|
+| **1K messages** | 200 | $1.95 | $4.68 | **$6.63** | $0.033 | $0.0066 |
+| **10K messages** | 2K | $7.81 | $46.75 | **$54.56** | $0.027 | $0.0055 |
+| **100K messages** | 20K | $52.15 | $467.50 | **$519.65** | $0.026 | $0.0052 |
+| **1M messages** | 200K | $485.20 | $4,675.00 | **$5,160.20** | $0.026 | $0.0052 |
+
+### **AWS Services Breakdown (10K messages/month)**
+| Service | Monthly Cost | Purpose |
+|---------|-------------|---------|
+| **Lambda** | $0.86 | Message processing functions |
+| **Step Functions** | $1.50 | Workflow orchestration |
+| **Bedrock AI** | $2.91 | Spam detection + AI responses |
+| **DynamoDB** | $2.20 | Lead and activity storage |
+| **API Gateway** | $0.03 | Webhook endpoint |
+| **CloudWatch** | $0.31 | Monitoring and logs |
+
+> **💡 Pro Tip**: 85% of costs come from Twilio WhatsApp messaging. AWS infrastructure scales efficiently with excellent cost-per-message economics.
+
+---
+
+## 🔧 Configuration & Customization
+
+### **Environment Variables**
+
+```bash
+# Required (add to .env)
+TWILIO_ACCOUNT_SID=your-twilio-account-sid
+TWILIO_AUTH_TOKEN=your-twilio-auth-token
+
+# Optional (AWS credentials can use CLI profile)
+AWS_ACCESS_KEY_ID=your-aws-access-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+AWS_DEFAULT_REGION=us-east-1
 ```
-pandasdb-crm-comm/
-├── serverless.yml                    # Main configuration (infrastructure, IAM, resources)
-├── lambda-functions.yml              # Lambda function definitions
-├── step-function-definition.yml      # Step Functions workflow
-├── package.json                      # Node.js dependencies and scripts
-├── requirements.txt                  # Python dependencies
-├── .env.example                      # Environment variables template
-├── src/handlers/                     # Lambda function source code
-│   ├── webhook_handler.py
-│   ├── check_content.py
-│   ├── check_phone_spammer.py
-│   ├── spam_detection.py
-│   ├── handle_spam.py
-│   └── handle_normal_message.py
-├── knowledge/
-│   └── system_prompt.txt             # AI knowledge base
-├── database/
-│   └── dynamodb_schema.yml           # Database schema documentation
-└── backoffice/                       # Optional monitoring interface
-    ├── serverless.yml
-    ├── frontend/
-    ├── api/
-    └── scripts/
+
+### **AI Knowledge Base Customization**
+
+Update `knowledge/system_prompt.txt` with your business information:
+
+```text
+## Company Description
+[Your company details, products, pricing, services]
+
+## Sales Process  
+[Your sales methodology and goals]
+
+## Conversation Style
+[Tone, personality, response guidelines]
 ```
+
+Deploy changes:
+```bash
+npm run upload-knowledge
+```
+
+### **Spam Detection Tuning**
+
+Adjust sensitivity in `src/handlers/spam_detection.py`:
+
+```python
+# Conservative (fewer false positives)
+spam_threshold = 0.8
+
+# Aggressive (catches more spam)  
+spam_threshold = 0.6
+
+# Balanced (recommended)
+spam_threshold = 0.7
+```
+
+---
+
+## 🚦 API Rate Limiting & Protection
+
+### **Current Protection Settings**
+
+Your webhook endpoint has built-in protection against abuse and excessive requests:
+
+~~~yaml
+# Current limits in lambda-functions.yml
+webhookHandler:
+ reservedConcurrency: 10    # Max 10 concurrent Lambda executions
+ events:
+   - http:
+       throttle:
+         rate: 10           # 10 requests per second
+         burst: 20          # 20 concurrent requests max
+~~~
+
+### **Cost Protection Analysis**
+
+With these limits, the **maximum daily cost** from malicious attacks is capped at approximately **$3.91/day** (~$117/month), as invalid requests are rejected quickly by Twilio signature validation before triggering expensive downstream services.
+
+### **Customizing Rate Limits**
+
+Modify `lambda-functions.yml` to adjust protection levels:
+
+~~~yaml
+webhookHandler:
+ handler: src/handlers/webhook_handler.lambda_handler
+ reservedConcurrency: 50    # Increase for higher traffic
+ events:
+   - http:
+       throttle:
+         rate: 100          # Requests per second
+         burst: 200         # Concurrent request burst
+~~~
+
+### **Recommended Settings by Usage**
+
+| Usage Level | Rate (req/sec) | Burst | Concurrency | Use Case |
+|-------------|----------------|-------|-------------|----------|
+| **Development** | 10 | 20 | 10 | Testing and small deployments |
+| **Small Business** | 50 | 100 | 25 | Up to 1K messages/day |
+| **Medium Business** | 100 | 200 | 50 | Up to 10K messages/day |
+| **Enterprise** | 500 | 1000 | 100 | High-volume production |
+
+### **Security Features**
+
+- **Twilio Signature Validation**: Rejects non-Twilio requests
+- **API Gateway Rate Limiting**: Prevents traffic spikes
+- **Lambda Concurrency Limits**: Controls resource usage
+- **CloudWatch Monitoring**: Tracks unusual patterns
+
+**⚠️ Important**: After changing limits, redeploy with `npm run deploy:dev`
 
 ---
 
@@ -245,55 +291,77 @@ NewProcessingStep:
 
 ---
 
-## 🔧 Configuration & Customization
+## 📁 Repository Structure
 
-### **Environment Variables**
-
-```bash
-# Required (add to .env)
-TWILIO_ACCOUNT_SID=your-twilio-account-sid
-TWILIO_AUTH_TOKEN=your-twilio-auth-token
-
-# Optional (AWS credentials can use CLI profile)
-AWS_ACCESS_KEY_ID=your-aws-access-key
-AWS_SECRET_ACCESS_KEY=your-aws-secret-key
-AWS_DEFAULT_REGION=us-east-1
+```
+pandasdb-crm-comm/
+├── serverless.yml                    # Main configuration (infrastructure, IAM, resources)
+├── lambda-functions.yml              # Lambda function definitions
+├── step-function-definition.yml      # Step Functions workflow
+├── package.json                      # Node.js dependencies and scripts
+├── requirements.txt                  # Python dependencies
+├── .env.example                      # Environment variables template
+├── src/handlers/                     # Lambda function source code
+│   ├── webhook_handler.py
+│   ├── check_content.py
+│   ├── check_phone_spammer.py
+│   ├── spam_detection.py
+│   ├── handle_spam.py
+│   └── handle_normal_message.py
+├── knowledge/
+│   └── system_prompt.txt             # AI knowledge base
+├── database/
+│   └── dynamodb_schema.yml           # Database schema documentation
+└── backoffice/                       # Optional monitoring interface
+    ├── serverless.yml
+    ├── frontend/
+    ├── api/
+    └── scripts/
 ```
 
-### **AI Knowledge Base Customization**
+---
 
-Update `knowledge/system_prompt.txt` with your business information:
+## 🏗️ System Architecture
 
-```text
-## Company Description
-[Your company details, products, pricing, services]
-
-## Sales Process  
-[Your sales methodology and goals]
-
-## Conversation Style
-[Tone, personality, response guidelines]
+```mermaid
+graph TB
+    A[WhatsApp User] -->|Message| B[Twilio Webhook]
+    B --> C[API Gateway]
+    C --> D[Step Functions]
+    
+    D --> E[Content Check]
+    E --> F[Phone Lookup]
+    F --> G[Spam Detection]
+    
+    G -->|Clean| H[AI Sales Agent]
+    G -->|Spam| I[Spam Handler]
+    
+    H --> J[Response Generation]
+    I --> K[Block/Warning]
+    
+    J --> L[Twilio Response]
+    K --> L
+    
+    F --> M[(DynamoDB)]
+    H --> N[Bedrock AI]
+    N --> O[S3 Knowledge Base]
+    
+    P[Optional Backoffice] --> Q[CloudFront CDN]
+    Q --> R[Real-time Analytics]
+    
+    style A fill:#25D366
+    style N fill:#FF9900
+    style M fill:#3F48CC
+    style P fill:#9D4EDD
 ```
 
-Deploy changes:
-```bash
-npm run upload-knowledge
-```
-
-### **Spam Detection Tuning**
-
-Adjust sensitivity in `src/handlers/spam_detection.py`:
-
-```python
-# Conservative (fewer false positives)
-spam_threshold = 0.8
-
-# Aggressive (catches more spam)  
-spam_threshold = 0.6
-
-# Balanced (recommended)
-spam_threshold = 0.7
-```
+### **Core Components**
+- **🔄 Step Functions**: Workflow orchestration
+- **⚡ Lambda Functions**: Serverless compute
+- **💾 DynamoDB**: NoSQL database for leads and activities
+- **🧠 Bedrock AI**: Claude 3 for spam detection and sales responses
+- **📱 Twilio Integration**: WhatsApp Business API
+- **📊 Optional Backoffice**: Web-based monitoring interface
 
 ---
 
@@ -416,62 +484,6 @@ Goal: Schedule meetings while answering questions
 - **Conversations**: Full history maintained
 - **Spam Logs**: 30-day rolling window for analytics
 - **System Logs**: 14-day CloudWatch retention
-
----
-
-## 🚦 API Rate Limiting & Protection
-
-### **Current Protection Settings**
-
-Your webhook endpoint has built-in protection against abuse and excessive requests:
-
-~~~yaml
-# Current limits in lambda-functions.yml
-webhookHandler:
- reservedConcurrency: 10    # Max 10 concurrent Lambda executions
- events:
-   - http:
-       throttle:
-         rate: 10           # 10 requests per second
-         burst: 20          # 20 concurrent requests max
-~~~
-
-### **Cost Protection Analysis**
-
-With these limits, the **maximum daily cost** from malicious attacks is capped at approximately **$3.91/day** (~$117/month), as invalid requests are rejected quickly by Twilio signature validation before triggering expensive downstream services.
-
-### **Customizing Rate Limits**
-
-Modify `lambda-functions.yml` to adjust protection levels:
-
-~~~yaml
-webhookHandler:
- handler: src/handlers/webhook_handler.lambda_handler
- reservedConcurrency: 50    # Increase for higher traffic
- events:
-   - http:
-       throttle:
-         rate: 100          # Requests per second
-         burst: 200         # Concurrent request burst
-~~~
-
-### **Recommended Settings by Usage**
-
-| Usage Level | Rate (req/sec) | Burst | Concurrency | Use Case |
-|-------------|----------------|-------|-------------|----------|
-| **Development** | 10 | 20 | 10 | Testing and small deployments |
-| **Small Business** | 50 | 100 | 25 | Up to 1K messages/day |
-| **Medium Business** | 100 | 200 | 50 | Up to 10K messages/day |
-| **Enterprise** | 500 | 1000 | 100 | High-volume production |
-
-### **Security Features**
-
-- **Twilio Signature Validation**: Rejects non-Twilio requests
-- **API Gateway Rate Limiting**: Prevents traffic spikes
-- **Lambda Concurrency Limits**: Controls resource usage
-- **CloudWatch Monitoring**: Tracks unusual patterns
-
-**⚠️ Important**: After changing limits, redeploy with `npm run deploy:dev`
 
 ---
 
