@@ -129,18 +129,16 @@ def lambda_handler(event, context):
         logger.info(f"Spam handled successfully for lead {lead_id}")
         
         return {
-            'statusCode': 200,
-            'body': json.dumps(response_data)
+            'body': response_data
         }
         
     except Exception as e:
         logger.error(f"Error handling spam: {str(e)}")
         return {
-            'statusCode': 500,
-            'body': json.dumps({
+            'body': {
                 'action': 'error',
                 'error': str(e)
-            })
+            }
         }
 
 def send_twilio_message(to_number, message_body, from_number):

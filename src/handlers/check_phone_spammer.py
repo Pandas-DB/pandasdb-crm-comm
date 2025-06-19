@@ -135,16 +135,14 @@ def lambda_handler(event, context):
             }
         
         return {
-            'statusCode': 200,
-            'body': json.dumps(response_data)
+            'body': response_data
         }
         
     except Exception as e:
         logger.error(f"Error checking phone/spammer status: {str(e)}")
         return {
-            'statusCode': 500,
-            'body': json.dumps({
+            'body': {
                 'action': 'error',
                 'error': str(e)
-            })
+            }
         }

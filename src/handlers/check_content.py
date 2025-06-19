@@ -33,11 +33,10 @@ def lambda_handler(event, context):
         if not message_body:
             logger.info("Message has no content, stopping execution")
             return {
-                'statusCode': 200,
-                'body': json.dumps({
+                'body': {
                     'action': 'stop',
                     'reason': 'empty_message'
-                })
+                }
             }
         
         # Clean phone numbers (remove whatsapp: prefix)
@@ -62,16 +61,14 @@ def lambda_handler(event, context):
         logger.info(f"Message has content, continuing with: {clean_from_number}")
         
         return {
-            'statusCode': 200,
-            'body': json.dumps(response_data)
+            'body': response_data
         }
         
     except Exception as e:
         logger.error(f"Error processing message: {str(e)}")
         return {
-            'statusCode': 500,
-            'body': json.dumps({
+            'body': {
                 'action': 'error',
                 'error': str(e)
-            })
+            }
         }

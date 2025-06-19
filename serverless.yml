@@ -96,6 +96,7 @@ functions:
     
   webhookHandler:
     handler: src/handlers/webhook_handler.lambda_handler
+    reservedConcurrency: 10  # Max 10 concurrent executions
     name: ${self:service}-${self:provider.stage}-webhook-handler
     description: Handle Twilio webhook and start Step Functions
     events:
@@ -106,6 +107,23 @@ functions:
 
 resources:
   Resources:
+
+    # API Gateway Usage Plan for Rate Limiting
+    ApiUsagePlan:
+      Type: AWS::ApiGateway::UsagePlan
+      Properties:
+        UsagePlanName: ${self:service}-${self:provider.stage}-usage-plan
+        Description: Usage plan for WhatsApp webhook rate limiting
+        ApiStages:
+          - ApiId: !Ref ApiGatewayRestApi
+            Stage: ${self:provider.stage}
+        Throttle:
+          RateLimit: 10      # 10 requests per second
+          BurstLimit: 20     # 20 concurrent requests max
+        Quota:
+          Limit: 10000       # 86400 requests per day (optional)
+          Period: DAY
+
     # DynamoDB Tables
     LeadsTable:
       Type: AWS::DynamoDB::Table

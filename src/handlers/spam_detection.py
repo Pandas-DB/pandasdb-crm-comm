@@ -29,13 +29,12 @@ def lambda_handler(event, context):
         if is_existing_spammer:
             logger.info("User already flagged as spammer, skipping AI check")
             return {
-                'statusCode': 200,
-                'body': json.dumps({
+                'body': {
                     'is_spam': True,
                     'spam_reason': 'existing_spammer',
                     'confidence': 1.0,
                     **input_data
-                })
+                }
             }
         
         # Initialize Bedrock client
@@ -115,30 +114,27 @@ def lambda_handler(event, context):
         }
         
         return {
-            'statusCode': 200,
-            'body': json.dumps(response_data)
+            'body': response_data
         }
         
     except ClientError as e:
         logger.error(f"Bedrock client error: {str(e)}")
         # Fallback: return non-spam if Bedrock fails
         return {
-            'statusCode': 200,
-            'body': json.dumps({
+            'body': {
                 'is_spam': False,
                 'spam_reason': 'bedrock_error',
                 'confidence': 0.0,
                 'error': str(e),
                 **input_data
-            })
+            }
         }
         
     except Exception as e:
         logger.error(f"Error in spam detection: {str(e)}")
         return {
-            'statusCode': 500,
-            'body': json.dumps({
+            'body': {
                 'action': 'error',
                 'error': str(e)
-            })
+            }
         }

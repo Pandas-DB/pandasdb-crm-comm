@@ -145,18 +145,16 @@ def lambda_handler(event, context):
         logger.info(f"Normal message processed successfully for lead {lead_id}")
         
         return {
-            'statusCode': 200,
-            'body': json.dumps(response_data)
+            'body': response_data
         }
         
     except Exception as e:
         logger.error(f"Error processing normal message: {str(e)}")
         return {
-            'statusCode': 500,
-            'body': json.dumps({
+            'body': {
                 'action': 'error',
                 'error': str(e)
-            })
+            }
         }
 
 def get_conversation_history(lead_id):
@@ -191,50 +189,6 @@ def get_conversation_history(lead_id):
                     'lead_message': content.get('leadMessage', ''),
                     'assistant_message': content.get('assistantMessage', '')
                 })
-        
-        return conversation_history
-        
-    except Exception as e:
-        logger.warning(f"Error getting conversation history: {str(e)}")
-        return []base_url, headers, lead_id):
-    """Get conversation history for the lead"""
-    try:
-        activity_params = {
-            'lead_id': f'eq.{lead_id}',
-            'activity_type': 'eq.whatsapp',
-            'order': 'created_at.desc',
-            'limit': 10,
-            'select': 'id,created_at'
-        }
-        
-        activities_response = requests.get(
-            f'{supabase_url}/rest/v1/activities',
-            headers=headers,
-            params=activity_params
-        )
-        activities_response.raise_for_status()
-        activities = activities_response.json()
-        
-        conversation_history = []
-        for activity in activities:
-            content_params = {'activity_id': f'eq.{activity["id"]}'}
-            content_response = requests.get(
-                f'{supabase_url}/rest/v1/activity_content',
-                headers=headers,
-                params=content_params
-            )
-            if content_response.status_code == 200:
-                content_data = content_response.json()
-                if content_data:
-                    content = content_data[0].get('content', {})
-                    if isinstance(content, str):
-                        content = json.loads(content)
-                    
-                    conversation_history.append({
-                        'timestamp': activity.get('created_at', ''),
-                        'lead_message': content.get('leadMessage', ''),
-                        'assistant_message': content.get('assistantMessage', '')
-                    })
         
         return conversation_history
         
