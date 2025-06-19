@@ -4,8 +4,8 @@
   "description": "PandasDB CRM Communication System using AWS Lambda, Step Functions, and Supabase",
   "scripts": {
     "deploy": "serverless deploy",
-    "deploy:dev": "serverless deploy --stage dev",
-    "deploy:prod": "serverless deploy --stage prod",
+    "deploy:dev": "dotenv -e .env -- serverless deploy --stage dev",
+    "deploy:prod": "dotenv -e .env -- serverless deploy --stage prod",
     "remove": "serverless remove",
     "logs": "serverless logs -f",
     "invoke": "serverless invoke -f",
@@ -14,9 +14,10 @@
   },
   "devDependencies": {
     "serverless": "^3.38.0",
-    "serverless-dotenv-plugin": "^6.0.0",
+    "serverless-dotenv-plugin": "^4.0.2",
     "serverless-python-requirements": "^6.0.0",
-    "serverless-step-functions": "^3.19.0"
+    "serverless-step-functions": "^3.19.0",
+    "dotenv-cli": "^7.4.2"
   },
   "author": "Your Name",
   "license": "MIT"
