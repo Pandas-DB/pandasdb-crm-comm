@@ -11,83 +11,30 @@ Transform your WhatsApp business communications with intelligent automation. Thi
 
 ---
 
-## 📁 Repository Structure
+## 📋 Table of Contents
 
-```
-pandasdb-crm-comm/
-├── serverless.yml                    # Main configuration (infrastructure, IAM, resources)
-├── lambda-functions.yml              # Lambda function definitions
-├── step-function-definition.yml      # Step Functions workflow
-├── package.json                      # Node.js dependencies and scripts
-├── requirements.txt                  # Python dependencies
-├── .env.example                      # Environment variables template
-├── src/handlers/                     # Lambda function source code
-│   ├── webhook_handler.py
-│   ├── check_content.py
-│   ├── check_phone_spammer.py
-│   ├── spam_detection.py
-│   ├── handle_spam.py
-│   └── handle_normal_message.py
-├── knowledge/
-│   └── system_prompt.txt             # AI knowledge base
-├── database/
-│   └── dynamodb_schema.yml           # Database schema documentation
-└── backoffice/                       # Optional monitoring interface
-    ├── serverless.yml
-    ├── frontend/
-    ├── api/
-    └── scripts/
-```
+### **🎯 Getting Started**
+- [Why PandasDB CRM?](#-why-pandasdb-crm) - Key benefits and business impact
+- [System Architecture](#️-system-architecture) - High-level technical overview
+- [Transparent Pricing](#-transparent-pricing) - Cost breakdown and estimates
+- [Quick Start](#-quick-start) - 5-minute deployment guide
 
----
+### **🏗️ Project Structure & Development**
+- [Repository Structure](#-repository-structure) - File organization
+- [Modifying Lambda Functions & Workflow](#-modifying-lambda-functions--workflow) - Development guide
+- [Configuration & Customization](#-configuration--customization) - Environment setup
+- [Testing & Development](#-testing--development) - Local development workflow
 
-## 🔧 Modifying Lambda Functions & Workflow
+### **🔧 Features & Technical Details**
+- [Features Deep Dive](#-features-deep-dive) - AI spam detection, sales agent, WhatsApp integration
+- [API Rate Limiting & Protection](#-api-rate-limiting--protection) - Security measures
+- [Security & Compliance](#-security--compliance) - Data protection and compliance
+- [Optional Backoffice Interface](#️-optional-backoffice-interface) - Web monitoring dashboard
 
-### **Adding a New Lambda Function**
-
-1. **Create the handler**: Add new Python file in `src/handlers/`
-2. **Update lambda-functions.yml**: Add function definition
-   ```yaml
-   newFunction:
-     handler: src/handlers/new_function.lambda_handler
-     name: ${self:service}-${self:provider.stage}-new-function
-     description: Description of new function
-   ```
-3. **Update IAM permissions** (if needed): Add resources to `serverless.yml`
-4. **Update Step Function workflow** (if needed): Modify `step-function-definition.yml`
-
-### **Removing a Lambda Function**
-
-1. **Remove from lambda-functions.yml**: Delete the function definition
-2. **Update Step Function workflow**: Remove references in `step-function-definition.yml`
-3. **Remove handler file**: Delete from `src/handlers/`
-4. **Clean up IAM permissions**: Remove unused resources from `serverless.yml`
-
-### **Modifying the Step Function Workflow**
-
-Edit `step-function-definition.yml` to:
-- **Add new states**: Insert new Task, Choice, or other state types
-- **Change flow logic**: Modify Choice conditions or state transitions
-- **Update error handling**: Add/modify Retry and Catch blocks
-- **Add parallel execution**: Use Parallel states for concurrent processing
-
-**Example - Adding a new step:**
-```yaml
-# In step-function-definition.yml
-NewProcessingStep:
-  Type: Task
-  Resource: !GetAtt NewFunctionLambdaFunction.Arn
-  Next: ExistingNextStep
-  Retry:
-    - ErrorEquals: ["Lambda.ServiceException"]
-      IntervalSeconds: 2
-      MaxAttempts: 3
-```
-
-### **Important Notes**
-- Always update both the Lambda definition AND the Step Function workflow when adding/removing functions
-- Lambda function names in Step Functions use the format: `{FunctionName}LambdaFunction.Arn`
-- Test changes in dev environment before production: `npm run deploy:dev`
+### **🚀 Operations & Maintenance**
+- [Monitoring & Operations](#-monitoring--operations) - Health monitoring and troubleshooting
+- [Contributing](#-contributing) - Development workflow and guidelines
+- [License & Legal](#-license--legal) - Legal information and commercial use
 
 ---
 
@@ -169,16 +116,6 @@ graph TB
 | **100K messages** | 20K | $52.15 | $467.50 | **$519.65** | $0.026 | $0.0052 |
 | **1M messages** | 200K | $485.20 | $4,675.00 | **$5,160.20** | $0.026 | $0.0052 |
 
-### **AWS Services Breakdown (10K messages/month)**
-| Service | Monthly Cost | Purpose |
-|---------|-------------|---------|
-| **Lambda** | $0.86 | Message processing functions |
-| **Step Functions** | $1.50 | Workflow orchestration |
-| **Bedrock AI** | $2.91 | Spam detection + AI responses |
-| **DynamoDB** | $2.20 | Lead and activity storage |
-| **API Gateway** | $0.03 | Webhook endpoint |
-| **CloudWatch** | $0.31 | Monitoring and logs |
-
 > **💡 Pro Tip**: 85% of costs come from Twilio WhatsApp messaging. AWS infrastructure scales efficiently with excellent cost-per-message economics.
 
 ---
@@ -225,6 +162,180 @@ cd backoffice
 
 # Access at CloudFront URL provided in output
 ```
+
+---
+
+## 📁 Repository Structure
+
+```
+pandasdb-crm-comm/
+├── serverless.yml                    # Main configuration (infrastructure, IAM, resources)
+├── lambda-functions.yml              # Lambda function definitions
+├── step-function-definition.yml      # Step Functions workflow
+├── package.json                      # Node.js dependencies and scripts
+├── requirements.txt                  # Python dependencies
+├── .env.example                      # Environment variables template
+├── src/handlers/                     # Lambda function source code
+│   ├── webhook_handler.py
+│   ├── check_content.py
+│   ├── check_phone_spammer.py
+│   ├── spam_detection.py
+│   ├── handle_spam.py
+│   └── handle_normal_message.py
+├── knowledge/
+│   └── system_prompt.txt             # AI knowledge base
+├── database/
+│   └── dynamodb_schema.yml           # Database schema documentation
+└── backoffice/                       # Optional monitoring interface
+    ├── serverless.yml
+    ├── frontend/
+    ├── api/
+    └── scripts/
+```
+
+---
+
+## 🔧 Modifying Lambda Functions & Workflow
+
+### **Adding a New Lambda Function**
+
+1. **Create the handler**: Add new Python file in `src/handlers/`
+2. **Update lambda-functions.yml**: Add function definition
+   ```yaml
+   newFunction:
+     handler: src/handlers/new_function.lambda_handler
+     name: ${self:service}-${self:provider.stage}-new-function
+     description: Description of new function
+   ```
+3. **Update IAM permissions** (if needed): Add resources to `serverless.yml`
+4. **Update Step Function workflow** (if needed): Modify `step-function-definition.yml`
+
+### **Removing a Lambda Function**
+
+1. **Remove from lambda-functions.yml**: Delete the function definition
+2. **Update Step Function workflow**: Remove references in `step-function-definition.yml`
+3. **Remove handler file**: Delete from `src/handlers/`
+4. **Clean up IAM permissions**: Remove unused resources from `serverless.yml`
+
+### **Modifying the Step Function Workflow**
+
+Edit `step-function-definition.yml` to:
+- **Add new states**: Insert new Task, Choice, or other state types
+- **Change flow logic**: Modify Choice conditions or state transitions
+- **Update error handling**: Add/modify Retry and Catch blocks
+- **Add parallel execution**: Use Parallel states for concurrent processing
+
+**Example - Adding a new step:**
+```yaml
+# In step-function-definition.yml
+NewProcessingStep:
+  Type: Task
+  Resource: !GetAtt NewFunctionLambdaFunction.Arn
+  Next: ExistingNextStep
+  Retry:
+    - ErrorEquals: ["Lambda.ServiceException"]
+      IntervalSeconds: 2
+      MaxAttempts: 3
+```
+
+### **Important Notes**
+- Always update both the Lambda definition AND the Step Function workflow when adding/removing functions
+- Lambda function names in Step Functions use the format: `{FunctionName}LambdaFunction.Arn`
+- Test changes in dev environment before production: `npm run deploy:dev`
+
+---
+
+## 🔧 Configuration & Customization
+
+### **Environment Variables**
+
+```bash
+# Required (add to .env)
+TWILIO_ACCOUNT_SID=your-twilio-account-sid
+TWILIO_AUTH_TOKEN=your-twilio-auth-token
+
+# Optional (AWS credentials can use CLI profile)
+AWS_ACCESS_KEY_ID=your-aws-access-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+AWS_DEFAULT_REGION=us-east-1
+```
+
+### **AI Knowledge Base Customization**
+
+Update `knowledge/system_prompt.txt` with your business information:
+
+```text
+## Company Description
+[Your company details, products, pricing, services]
+
+## Sales Process  
+[Your sales methodology and goals]
+
+## Conversation Style
+[Tone, personality, response guidelines]
+```
+
+Deploy changes:
+```bash
+npm run upload-knowledge
+```
+
+### **Spam Detection Tuning**
+
+Adjust sensitivity in `src/handlers/spam_detection.py`:
+
+```python
+# Conservative (fewer false positives)
+spam_threshold = 0.8
+
+# Aggressive (catches more spam)  
+spam_threshold = 0.6
+
+# Balanced (recommended)
+spam_threshold = 0.7
+```
+
+---
+
+## 🧪 Testing & Development
+
+### **Local Development**
+
+```bash
+# Install dependencies
+npm install
+cd backoffice && npm install
+
+# Run tests (when available)
+npm test
+
+# Local backoffice development
+cd backoffice && npm run dev
+# Visit http://localhost:8080
+```
+
+### **Testing Deployment**
+
+```bash
+# Deploy to dev environment
+npm run deploy:dev
+
+# Run integration tests
+cd backoffice && ./scripts/test-deployment.sh dev
+
+# Load test endpoints
+curl -X POST https://your-api.com/webhook/whatsapp \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "From=whatsapp:+1234567890&To=whatsapp:+14155238886&Body=Test message"
+```
+
+### **Performance Testing**
+
+**Load Testing Recommendations**
+- **Gradual Ramp**: Start with 10 msg/min, increase to target volume
+- **Burst Testing**: Test with 10x normal load for 5 minutes
+- **Monitoring**: Watch Lambda duration, DynamoDB throttling
+- **Cost Tracking**: Monitor spend during high-volume tests
 
 ---
 
@@ -308,114 +419,6 @@ Goal: Schedule meetings while answering questions
 
 ---
 
-## 🖥️ Optional Backoffice Interface
-
-> **Note**: The backoffice is completely optional and deployed separately
-
-### **🎨 Modern Web Interface**
-
-**Dashboard Features**
-- 📊 **Real-time Analytics**: Live statistics and trends
-- 🔍 **Lead Lookup**: Search and view conversation history
-- 🚫 **Spam Monitoring**: Track flagged content and users
-- ⚙️ **System Health**: Monitor all components
-
-**Technical Details**
-- **Frontend**: Pure JavaScript, modern CSS with gradients
-- **Hosting**: S3 + CloudFront for global performance
-- **Security**: Read-only interface, HTTPS enforced
-- **Cost**: Additional $1-5/month for hosting
-
-### **🚀 Backoffice Deployment**
-
-```bash
-# Deploy infrastructure + frontend
-cd backoffice
-./scripts/deploy.sh dev
-
-# Manual deployment
-npm run deploy-infra    # Create S3 + CloudFront
-npm run deploy-frontend # Upload static files  
-npm run invalidate      # Clear CDN cache
-
-# Remove completely
-npm run remove-infra
-```
-
-### **📈 Analytics Capabilities**
-
-**Daily Insights**
-- Total leads in system
-- Message volume and trends
-- Spam detection rates
-- User classification status
-
-**Lead Management**
-- Individual conversation history
-- Contact method tracking
-- Activity timeline visualization
-- Response performance metrics
-
-**Spam Intelligence**
-- Detection accuracy monitoring
-- User behavior patterns
-- Blocking effectiveness
-- False positive tracking
-
----
-
-## 🔧 Configuration & Customization
-
-### **Environment Variables**
-
-```bash
-# Required (add to .env)
-TWILIO_ACCOUNT_SID=your-twilio-account-sid
-TWILIO_AUTH_TOKEN=your-twilio-auth-token
-
-# Optional (AWS credentials can use CLI profile)
-AWS_ACCESS_KEY_ID=your-aws-access-key
-AWS_SECRET_ACCESS_KEY=your-aws-secret-key
-AWS_DEFAULT_REGION=us-east-1
-```
-
-### **AI Knowledge Base Customization**
-
-Update `knowledge/system_prompt.txt` with your business information:
-
-```text
-## Company Description
-[Your company details, products, pricing, services]
-
-## Sales Process  
-[Your sales methodology and goals]
-
-## Conversation Style
-[Tone, personality, response guidelines]
-```
-
-Deploy changes:
-```bash
-npm run upload-knowledge
-```
-
-### **Spam Detection Tuning**
-
-Adjust sensitivity in `src/handlers/spam_detection.py`:
-
-```python
-# Conservative (fewer false positives)
-spam_threshold = 0.8
-
-# Aggressive (catches more spam)  
-spam_threshold = 0.6
-
-# Balanced (recommended)
-spam_threshold = 0.7
-```
-
----
-
 ## 🚦 API Rate Limiting & Protection
 
 ### **Current Protection Settings**
@@ -470,6 +473,8 @@ webhookHandler:
 
 **⚠️ Important**: After changing limits, redeploy with `npm run deploy:dev`
 
+---
+
 ## 🔒 Security & Compliance
 
 ### **Data Protection**
@@ -489,6 +494,62 @@ webhookHandler:
 - **Message Templates**: Support for approved templates
 - **Opt-out Handling**: Automatic unsubscribe management
 - **Rate Limiting**: Respects WhatsApp sending limits
+
+---
+
+## 🖥️ Optional Backoffice Interface
+
+> **Note**: The backoffice is completely optional and deployed separately
+
+### **🎨 Modern Web Interface**
+
+**Dashboard Features**
+- 📊 **Real-time Analytics**: Live statistics and trends
+- 🔍 **Lead Lookup**: Search and view conversation history
+- 🚫 **Spam Monitoring**: Track flagged content and users
+- ⚙️ **System Health**: Monitor all components
+
+**Technical Details**
+- **Frontend**: Pure JavaScript, modern CSS with gradients
+- **Hosting**: S3 + CloudFront for global performance
+- **Security**: Read-only interface, HTTPS enforced
+- **Cost**: Additional $1-5/month for hosting
+
+### **🚀 Backoffice Deployment**
+
+```bash
+# Deploy infrastructure + frontend
+cd backoffice
+./scripts/deploy.sh dev
+
+# Manual deployment
+npm run deploy-infra    # Create S3 + CloudFront
+npm run deploy-frontend # Upload static files  
+npm run invalidate      # Clear CDN cache
+
+# Remove completely
+npm run remove-infra
+```
+
+### **📈 Analytics Capabilities**
+
+**Daily Insights**
+- Total leads in system
+- Message volume and trends
+- Spam detection rates
+- User classification status
+
+**Lead Management**
+- Individual conversation history
+- Contact method tracking
+- Activity timeline visualization
+- Response performance metrics
+
+**Spam Intelligence**
+- Detection accuracy monitoring
+- User behavior patterns
+- Blocking effectiveness
+- False positive tracking
 
 ---
 
@@ -555,48 +616,6 @@ webhookHandler:
 
 ---
 
-## 🧪 Testing & Development
-
-### **Local Development**
-
-```bash
-# Install dependencies
-npm install
-cd backoffice && npm install
-
-# Run tests (when available)
-npm test
-
-# Local backoffice development
-cd backoffice && npm run dev
-# Visit http://localhost:8080
-```
-
-### **Testing Deployment**
-
-```bash
-# Deploy to dev environment
-npm run deploy:dev
-
-# Run integration tests
-cd backoffice && ./scripts/test-deployment.sh dev
-
-# Load test endpoints
-curl -X POST https://your-api.com/webhook/whatsapp \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "From=whatsapp:+1234567890&To=whatsapp:+14155238886&Body=Test message"
-```
-
-### **Performance Testing**
-
-**Load Testing Recommendations**
-- **Gradual Ramp**: Start with 10 msg/min, increase to target volume
-- **Burst Testing**: Test with 10x normal load for 5 minutes
-- **Monitoring**: Watch Lambda duration, DynamoDB throttling
-- **Cost Tracking**: Monitor spend during high-volume tests
-
----
-
 ## 🤝 Contributing
 
 ### **Development Workflow**
@@ -628,9 +647,6 @@ git push origin feature/your-feature-name
 - **Error Handling**: Graceful degradation and retry logic
 - **Logging**: Structured logging with correlation IDs
 - **Security**: Validate all inputs, use least privilege
-
----
-
 
 ### **Contributing**
 
