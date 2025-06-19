@@ -40,6 +40,12 @@ provider:
             - arn:aws:bedrock:*:*:foundation-model/anthropic.claude-3-sonnet-20240229-v1:0
         - Effect: Allow
           Action:
+            - bedrock:InvokeModelWithResponseStream
+          Resource: 
+            - arn:aws:bedrock:*:*:foundation-model/anthropic.claude-3-haiku-20240307-v1:0
+            - arn:aws:bedrock:*:*:foundation-model/anthropic.claude-3-sonnet-20240229-v1:0
+        - Effect: Allow
+          Action:
             - s3:GetObject
           Resource: 
             - !Join ['', [!GetAtt KnowledgeBaseBucket.Arn, '/*']]
