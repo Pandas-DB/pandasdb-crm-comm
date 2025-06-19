@@ -3,6 +3,7 @@ import logging
 import boto3
 import os
 from urllib.parse import parse_qs
+from twilio.request_validator import RequestValidator
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -22,23 +23,42 @@ def lambda_handler(event, context):
         if not isinstance(headers, dict):
             headers = {}
         
-        # Skip signature validation for debugging
-        logger.info("Skipping signature validation for debugging")
+        request_context = event.get('requestContext', {}) or {}
         
-        # Parse Twilio webhook data
+        # Parse Twilio webhook data FIRST
         body = event.get('body', '')
         logger.info(f"Raw body: {body}")
         
-        # Check content type safely
-        content_type = headers.get('content-type', '') if isinstance(headers, dict) else ''
+        # Check content type safely - try both lowercase and capitalized
+        content_type = headers.get('content-type', '') or headers.get('Content-Type', '')
+        logger.info(f"Content type: {content_type}")
         
+        # Parse the body correctly based on content type
         if content_type.startswith('application/x-www-form-urlencoded'):
+            logger.info("Parsing as form-encoded data")
             parsed_body = parse_qs(body)
             webhook_data = {k: v[0] if len(v) == 1 else v for k, v in parsed_body.items()}
         else:
+            logger.info("Parsing as JSON data")
             webhook_data = json.loads(body) if body else {}
         
         logger.info(f"Parsed webhook data: {webhook_data}")
+        
+        # Validate Twilio signature - ALWAYS REQUIRED
+        validator = RequestValidator(os.environ['TWILIO_AUTH_TOKEN'])
+        signature = headers.get('X-Twilio-Signature', '')
+        url = f"https://{headers.get('Host', '')}{request_context.get('path', '')}"
+        
+        # Pass the parsed webhook_data (dict) instead of raw body (string)
+        if not validator.validate(url, webhook_data, signature):
+            logger.warning("Invalid Twilio signature - request rejected")
+            return {
+                'statusCode': 403,
+                'headers': {'Content-Type': 'application/xml'},
+                'body': '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
+            }
+        
+        logger.info("Twilio signature validated successfully")
         
         # Validate required fields
         required_fields = ['From', 'To', 'Body']
