@@ -11,8 +11,6 @@ provider:
   timeout: 30
   
   environment:
-    TWILIO_ACCOUNT_SID: ${env:TWILIO_ACCOUNT_SID}
-    TWILIO_AUTH_TOKEN: ${env:TWILIO_AUTH_TOKEN}
     S3_KNOWLEDGE_BUCKET: !Ref KnowledgeBaseBucket
     S3_KNOWLEDGE_FILE: knowledge/system_prompt.txt
     LEADS_TABLE: !Ref LeadsTable
@@ -22,6 +20,11 @@ provider:
     ACTIVITY_CONTENT_TABLE: !Ref ActivityContentTable
     SPAM_ACTIVITIES_TABLE: !Ref SpamActivitiesTable
     STATE_MACHINE_NAME: ${self:service}-${self:provider.stage}-processor
+    
+    DEFAULT_PLATFORM: whatsapp
+    TWILIO_ACCOUNT_SID: ${env:TWILIO_ACCOUNT_SID}
+    TWILIO_AUTH_TOKEN: ${env:TWILIO_AUTH_TOKEN}
+    TELEGRAM_BOT_TOKEN: ${env:TELEGRAM_BOT_TOKEN, ''}
     
   iam:
     role:
@@ -268,6 +271,7 @@ resources:
                     - !GetAtt SpamDetectionLambdaFunction.Arn
                     - !GetAtt HandleSpamLambdaFunction.Arn
                     - !GetAtt HandleNormalMessageLambdaFunction.Arn
+                    - !GetAtt SendMessageLambdaFunction.Arn
 
     # Step Functions State Machine
     WhatsAppStateMachine:

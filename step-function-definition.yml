@@ -1,4 +1,4 @@
-Comment: "WhatsApp Lead Bot Processing Pipeline"
+Comment: "Multi-Platform Lead Bot Processing Pipeline"
 StartAt: CheckMessageContent
 States:
   CheckMessageContent:
@@ -76,7 +76,7 @@ States:
   HandleSpamMessage:
     Type: Task
     Resource: !GetAtt HandleSpamLambdaFunction.Arn
-    Next: SpamProcessed
+    Next: SendSpamResponse  # CHANGED: Send response instead of direct success
     Retry:
       - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
         IntervalSeconds: 2
@@ -90,7 +90,7 @@ States:
   HandleNormalMessage:
     Type: Task
     Resource: !GetAtt HandleNormalMessageLambdaFunction.Arn
-    Next: MessageProcessed
+    Next: SendNormalResponse  # CHANGED: Send response instead of direct success
     Retry:
       - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
         IntervalSeconds: 2
@@ -100,6 +100,34 @@ States:
       - ErrorEquals: ["States.ALL"]
         Next: ProcessingFailed
         ResultPath: "$.error"
+  
+  SendSpamResponse:
+    Type: Task
+    Resource: !GetAtt SendMessageLambdaFunction.Arn
+    Next: SpamProcessed
+    Retry:
+      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+        IntervalSeconds: 2
+        MaxAttempts: 3
+        BackoffRate: 2.0
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: SpamProcessed
+        Comment: "Continue even if message sending fails"
+  
+  SendNormalResponse:
+    Type: Task
+    Resource: !GetAtt SendMessageLambdaFunction.Arn
+    Next: MessageProcessed
+    Retry:
+      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+        IntervalSeconds: 2
+        MaxAttempts: 3
+        BackoffRate: 2.0
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: MessageProcessed
+        Comment: "Continue even if message sending fails"
   
   SpamProcessed:
     Type: Succeed

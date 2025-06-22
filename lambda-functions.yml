@@ -22,14 +22,23 @@ handleNormalMessage:
   handler: src/handlers/handle_normal_message.lambda_handler
   name: ${self:service}-${self:provider.stage}-handle-normal-message
   description: Handle normal messages with AI agent
+
+sendMessage:
+  handler: src/handlers/send_message.lambda_handler
+  name: ${self:service}-${self:provider.stage}-send-message
+  description: Send messages through various platforms (WhatsApp, Telegram, etc.)
   
 webhookHandler:
   handler: src/handlers/webhook_handler.lambda_handler
-  reservedConcurrency: 10  # Max 10 concurrent executions
+  reservedConcurrency: 10
   name: ${self:service}-${self:provider.stage}-webhook-handler
-  description: Handle Twilio webhook and start Step Functions
+  description: Handle webhooks from various platforms and start Step Functions
   events:
     - http:
-        path: /webhook/whatsapp
+        path: /webhook/phone
         method: post
         cors: true
+        request:
+          parameters:
+            querystrings:
+              platform: true
