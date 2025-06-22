@@ -469,8 +469,14 @@ curl -X POST "https://your-api.com/webhook/phone?platform=telegram" \
 - Platform-specific spam patterns
 ```
 
+**Volume-Based Protection**
+- **40+ messages/day**: Warning logged, user approaching limit
+- **50+ messages/day**: Automatically marked as spam and blocked
+- **5 spam flags (30 days)**: Permanent spam classification
+
 **Spam Management**
 - **Progressive Warnings**: 5-strike system before blocking
+- **Daily Limits**: Volume-based protection against message flooding
 - **Automatic Appeals**: Email-based error reporting
 - **Analytics**: Track spam patterns and detection accuracy
 
