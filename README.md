@@ -93,8 +93,8 @@ cp .env.example .env
 # 3. Deploy to AWS
 npm run deploy:dev
 
-# 4. Upload AI knowledge base
-npm run upload-knowledge
+# 4. Upload AI knowledge base (automatically included in deploy:dev)
+# npm run upload-knowledge
 
 # 5. Configure platform webhooks (use URLs from deployment output)
 # WhatsApp: https://your-api-id.execute-api.region.amazonaws.com/dev/webhook/phone?platform=whatsapp
@@ -186,22 +186,22 @@ Update `knowledge/system_prompt.txt` with your business information:
 
 Deploy changes:
 ```bash
-npm run upload-knowledge
+npm run deploy:dev  # Automatically uploads config and knowledge
 ```
 
 ### **Spam Detection Tuning**
 
-Adjust sensitivity in `src/handlers/spam_detection.py`:
+Adjust settings in `config/business.json`:
 
-```python
-# Conservative (fewer false positives)
-spam_threshold = 0.8
-
-# Aggressive (catches more spam)  
-spam_threshold = 0.6
-
-# Balanced (recommended)
-spam_threshold = 0.7
+```json
+{
+  "spam_detection": {
+    "spam_threshold_30_days": 5,           // 5 spam flags = permanent block
+    "daily_message_warning_threshold": 40, // Warning at 40 messages/day
+    "daily_message_spam_threshold": 50,    // Block at 50 messages/day
+    "ai_confidence_threshold": 0.7         // AI spam confidence threshold
+  }
+}
 ```
 
 ---
@@ -334,6 +334,8 @@ pandasdb-crm-comm/
 ├── package.json                      # Node.js dependencies and scripts
 ├── requirements.txt                  # Python dependencies
 ├── .env.example                      # Environment variables template
+├── config/
+│   └── business.json                 # Business logic configuration (spam rules, AI settings)
 ├── src/handlers/                     # Lambda function source code
 │   ├── webhook_handler.py            # Multi-platform webhook router
 │   ├── check_content.py
