@@ -63,6 +63,11 @@ def lambda_handler(event, context):
         
         if not system_prompt:
             system_prompt = get_default_system_prompt()
+        system_prompt = f'''{system_prompt} 
+          ## CRITICAL RESPONSE RULES
+          - MAXIMUM 199 characters per response - this is MANDATORY
+          - Use short sentences and abbreviations when needed
+        '''
         
         # Prepare the request for Bedrock
         body = {
