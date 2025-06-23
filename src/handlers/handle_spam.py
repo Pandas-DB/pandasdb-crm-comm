@@ -5,6 +5,8 @@ import os
 from datetime import datetime, timedelta
 import uuid
 
+from aux import load_business_config
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -76,8 +78,8 @@ def lambda_handler(event, context):
             }
         )
         
-        # Get current spam count to determine response (last 30 days)
-        thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
+        # Get current spam count to determine response (last N days, by default 30)
+        thirty_days_ago = (datetime.now() - timedelta(days=config['spam_detection']['spam_lookback_days'])).isoformat()  # by default 30 lookback days
         spam_response = spam_activities_table.query(
             IndexName='lead-id-spam-date-index',
             KeyConditionExpression='lead_id = :lead_id AND spam_date >= :date',
@@ -87,11 +89,12 @@ def lambda_handler(event, context):
             }
         )
         
-        spam_count_30_days = len(spam_response['Items'])
-        is_spammer = spam_count_30_days >= 5
+        spam_count_window_days = len(spam_response['Items'])
+        config = load_business_config()
+        is_spammer = config['spam_detection']['spam_threshold_days']
         
         # Determine response message based on spam count
-        if is_spammer or spam_count_30_days >= 5:
+        if is_spammer or spam_count_window_days >= config['spam_detection']['spam_threshold_days_window']:  # by default 5
             response_message = "Lo siento, te hemos clasificado como spam y no volveremos a responder tus mensajes. Si se trata de un error envía un email a errores@test.com y encantados revisaremos tu caso."
             action_type = "blocked"
         else:
@@ -122,8 +125,8 @@ def lambda_handler(event, context):
             'response_sent': True,
             'response_message': response_message,
             'action_type': action_type,
-            'spam_count': spam_count_30_days + 1,
-            'is_blocked': is_spammer or spam_count_30_days >= 4
+            'spam_count': spam_count_window_days + 1,
+            'is_blocked': is_spammer or spam_count_window_days >= config['spam_detection']['spam_threshold_30_days']
         }
         
         logger.info(f"Spam handled successfully for lead {lead_id}")

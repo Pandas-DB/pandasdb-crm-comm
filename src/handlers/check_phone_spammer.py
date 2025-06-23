@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 import uuid
 from botocore.exceptions import ClientError
 
+from aux import load_business_config
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -65,8 +67,10 @@ def lambda_handler(event, context):
                 }
             )
             
-            spam_count_30_days = len(spam_response['Items'])
-            is_spammer = spam_count_30_days >= 5
+            config = load_business_config()
+
+            spam_count_in_days_window = len(spam_response['Items'])
+            is_spammer = spam_count_in_days_window >= config['spam_detection']['spam_threshold_in_days_window']
             
             # Check daily message volume
             today = datetime.now().date().isoformat()
@@ -82,13 +86,13 @@ def lambda_handler(event, context):
             daily_message_count = len(daily_activities_response['Items'])
             
             # Check if daily limit reached (50+ messages = spam)
-            if daily_message_count >= 50:
+            if daily_message_count >= config['spam_detection']['daily_message_spam_threshold']:  # 50 by default
                 is_spammer = True
                 logger.info(f"Lead {lead_id} marked as spammer: {daily_message_count} messages today")
-            elif daily_message_count >= 40:
+            elif daily_message_count >= daily_message_count >= config['spam_detection']['daily_message_warning_threshold']:  # 40 by default
                 logger.warning(f"Lead {lead_id} approaching spam limit: {daily_message_count} messages today")
             
-            logger.info(f"Spammer status: {is_spammer}, 30-day count: {spam_count_30_days}, daily count: {daily_message_count}")
+            logger.info(f"Spammer status: {is_spammer}, 30-day count: {spam_count_in_days_window}, daily count: {daily_message_count}")
             
             response_data = {
                 'action': 'existing_user',

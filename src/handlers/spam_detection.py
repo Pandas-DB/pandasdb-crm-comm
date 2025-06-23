@@ -68,10 +68,11 @@ def lambda_handler(event, context):
         Example response: {{"is_spam": true, "confidence": 0.9, "reason": "repetitive meaningless text"}}
         """
         
+        config = load_business_config()
         # Prepare the request body for Claude
         body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 200,
+            "anthropic_version": config['ai_models']['bedrock_version'],
+            "max_tokens": config['ai_models']['max_tokens_spam_detection'],
             "messages": [
                 {
                     "role": "user",
@@ -83,7 +84,7 @@ def lambda_handler(event, context):
         # Call Bedrock
         response = bedrock_runtime.invoke_model(
             body=json.dumps(body),
-            modelId='anthropic.claude-3-haiku-20240307-v1:0',
+            modelId=modelId=config['ai_models']['bedrock_model_id'],
             accept='application/json',
             contentType='application/json'
         )

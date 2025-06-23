@@ -5,6 +5,8 @@ import os
 from datetime import datetime
 import uuid
 
+from aux import load_business_config
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -60,12 +62,13 @@ def lambda_handler(event, context):
         
         # Load system prompt from S3 or use default
         system_prompt = load_system_prompt_from_s3()
+        config = load_business_config()
         
         if not system_prompt:
             system_prompt = get_default_system_prompt()
         system_prompt = f'''{system_prompt} 
           ## CRITICAL RESPONSE RULES
-          - MAXIMUM 199 characters per response - this is MANDATORY
+          - MAXIMUM {config['message_limits']['max_response_characters']} characters per response - this is MANDATORY
           - Use short sentences and abbreviations when needed
         '''
         
@@ -95,8 +98,10 @@ def lambda_handler(event, context):
         ai_response = response_body.get('content', [{}])[0].get('text', '')
         
         # Ensure response is within character limit
-        if len(ai_response) > 280:
-            ai_response = ai_response[:277] + "..."
+        if len(ai_response) > config['message_limits']['character_limit_fallback']:
+            ai_response = ai_response[:config['message_limits']['character_limit_truncate']]
+ + "..."
+            
         
         logger.info(f"AI generated response: {ai_response}")
         
@@ -175,7 +180,7 @@ def get_conversation_history(lead_id):
             KeyConditionExpression='lead_id = :lead_id',
             ExpressionAttributeValues={':lead_id': lead_id},
             ScanIndexForward=False,  # Most recent first
-            Limit=10
+            Limit=config['message_limits']['conversation_history_limit']
         )
         
         conversation_history = []
