@@ -19,16 +19,14 @@ def lambda_handler(event, context):
     
     try:
         # Parse input from previous lambda
-        if isinstance(event.get('body'), str):
-            input_data = json.loads(event.get('body'))
-        else:
-            input_data = event.get('body', event)
+        flow_input = event.get('flow_input', {})
+        if isinstance(flow_input, str):
+            flow_input = json.loads(flow_input)
             
-        message_data = input_data.get('message_data', {})
-        platform = input_data['platform']  # Get platform (mandatory)
-        clean_phone_number = message_data.get('clean_phone_number', '')
-        profile_name = message_data.get('profile_name', 'Unknown User')
-        message_sid = message_data.get('message_sid', '')
+        platform = flow_input['platform']  # Get platform (mandatory)
+        clean_phone_number = flow_input.get('From', '')
+        profile_name = flow_input.get('ProfileName', 'Unknown User')
+        message_sid = flow_input.get('MessageSid', '')
         
         logger.info(f"Checking {platform} phone number: {clean_phone_number}")
         
@@ -70,7 +68,7 @@ def lambda_handler(event, context):
             config = load_business_config()
 
             spam_count_in_days_window = len(spam_response['Items'])
-            is_spammer = spam_count_in_days_window >= config['spam_detection']['spam_threshold_in_days_window']
+            is_spammer = spam_count_in_days_window >= config['spam_detection']['spam_threshold_30_days']
             
             # Check daily message volume
             today = datetime.now().date().isoformat()
@@ -89,7 +87,7 @@ def lambda_handler(event, context):
             if daily_message_count >= config['spam_detection']['daily_message_spam_threshold']:  # 50 by default
                 is_spammer = True
                 logger.info(f"Lead {lead_id} marked as spammer: {daily_message_count} messages today")
-            elif daily_message_count >= daily_message_count >= config['spam_detection']['daily_message_warning_threshold']:  # 40 by default
+            elif daily_message_count >= config['spam_detection']['daily_message_warning_threshold']:  # 40 by default
                 logger.warning(f"Lead {lead_id} approaching spam limit: {daily_message_count} messages today")
             
             logger.info(f"Spammer status: {is_spammer}, 30-day count: {spam_count_in_days_window}, daily count: {daily_message_count}")
@@ -99,9 +97,8 @@ def lambda_handler(event, context):
                 'lead_id': lead_id,
                 'contact_method_id': contact_method_id,
                 'is_spammer': is_spammer,
-                'platform': platform,  # Pass platform along
                 'daily_message_count': daily_message_count,  # Add daily count
-                'message_data': message_data
+                'flow_input': flow_input
             }
             
         else:
@@ -161,20 +158,15 @@ def lambda_handler(event, context):
                 'lead_id': lead_id,
                 'contact_method_id': contact_method_id,
                 'is_spammer': False,
-                'platform': platform,  # Pass platform along
                 'daily_message_count': 1,  # First message of the day
-                'message_data': message_data
+                'flow_input': flow_input
             }
         
-        return {
-            'body': response_data
-        }
+        return response_data
         
     except Exception as e:
         logger.error(f"Error checking phone/spammer status: {str(e)}")
         return {
-            'body': {
-                'action': 'error',
-                'error': str(e)
-            }
+            'action': 'error',
+            'error': str(e)
         }

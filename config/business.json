@@ -1,0 +1,27 @@
+{
+  "spam_detection": {
+    "spam_threshold_days_window": 5,
+    "spam_lookback_days": 30,
+    "daily_message_warning_threshold": 40,
+    "daily_message_spam_threshold": 50,
+    "ai_confidence_threshold": 0.7,
+    "fallback_confidence": 0.7
+  },
+  "spam_messages": {
+    "warning_message_es": "Creemos que tu mensaje es spam. Después de 5 avisos como este procederemos a bloquear tu número.",
+    "blocked_message_es": "Lo siento, te hemos clasificado como spam y no volveremos a responder tus mensajes. Si se trata de un error envía un email a errores@test.com y encantados revisaremos tu caso.",
+    "support_email": "errores@test.com"
+  },
+  "ai_models": {
+    "bedrock_model_id": "anthropic.claude-3-haiku-20240307-v1:0",
+    "bedrock_version": "bedrock-2023-05-31",
+    "max_tokens_spam_detection": 200,
+    "max_tokens_conversation": 300
+  },
+  "message_limits": {
+    "max_response_characters": 199,
+    "character_limit_fallback": 280,
+    "character_limit_truncate": 277,
+    "conversation_history_limit": 10
+  }
+}
