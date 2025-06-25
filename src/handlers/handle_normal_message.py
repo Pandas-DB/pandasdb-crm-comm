@@ -39,6 +39,42 @@ def lambda_handler(event, context):
         activities_table = dynamodb.Table(os.environ['ACTIVITIES_TABLE'])
         activity_content_table = dynamodb.Table(os.environ['ACTIVITY_CONTENT_TABLE'])
         
+        timestamp = datetime.now().isoformat()
+        
+        # Create inbound activity record BEFORE using Bedrock
+        activity_id = str(uuid.uuid4())
+        activities_table.put_item(
+            Item={
+                'id': activity_id,
+                'lead_id': lead_id,
+                'contact_method_id': contact_method_id,
+                'activity_type': platform,
+                'status': 'completed',
+                'direction': 'inbound',
+                'completed_at': timestamp,
+                'created_at': timestamp,
+                'metadata': {
+                    'messageSid': message_sid,
+                    'profileName': profile_name,
+                    'messageType': 'text',
+                    'platform': platform
+                }
+            }
+        )
+        
+        # Store inbound activity content BEFORE using Bedrock
+        activity_content_table.put_item(
+            Item={
+                'id': str(uuid.uuid4()),
+                'activity_id': activity_id,
+                'content_type': platform,
+                'content': {
+                    'leadMessage': message_body
+                },
+                'created_at': timestamp
+            }
+        )
+        
         # Get conversation history
         conversation_history = get_conversation_history(lead_id)
         
@@ -103,43 +139,6 @@ def lambda_handler(event, context):
         
         logger.info(f"AI generated response: {ai_response}")
         
-        timestamp = datetime.now().isoformat()
-        
-        # Create activity record
-        activity_id = str(uuid.uuid4())
-        activities_table.put_item(
-            Item={
-                'id': activity_id,
-                'lead_id': lead_id,
-                'contact_method_id': contact_method_id,
-                'activity_type': platform,
-                'status': 'completed',
-                'direction': 'inbound',
-                'completed_at': timestamp,
-                'created_at': timestamp,
-                'metadata': {
-                    'messageSid': message_sid,
-                    'profileName': profile_name,
-                    'messageType': 'text',
-                    'platform': platform
-                }
-            }
-        )
-        
-        # Store activity content
-        activity_content_table.put_item(
-            Item={
-                'id': str(uuid.uuid4()),
-                'activity_id': activity_id,
-                'content_type': platform,
-                'content': {
-                    'leadMessage': message_body,
-                    'assistantMessage': ai_response
-                },
-                'created_at': timestamp
-            }
-        )
-        
         response_data = {
             'action': 'message_processed',
             'activity_id': activity_id,
@@ -150,7 +149,8 @@ def lambda_handler(event, context):
                 'platform': platform,
                 'to': clean_phone_number,
                 'message': ai_response,
-                'from': original_to
+                'from': original_to,
+                'answer_to_activity_id': activity_id
             }
         }
         

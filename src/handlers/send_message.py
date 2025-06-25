@@ -21,6 +21,7 @@ def lambda_handler(event, context):
         to_number = send_message_data.get('to', '')
         message_body = send_message_data.get('message', '')
         from_number = send_message_data.get('from', '')
+        answer_to_activity_id = send_message_data.get('answer_to_activity_id', '')
         
         logger.info(f"Sending message via {platform} to {to_number}: {message_body[:100]}")
         
@@ -35,6 +36,10 @@ def lambda_handler(event, context):
                 'action': 'error',
                 'error': f'Unsupported platform: {platform}'
             }
+        
+        # Store outbound activity and content ONLY after successful sending
+        if result.get('success'):
+            log_outbound_message(event, send_message_data, result, answer_to_activity_id)
         
         response_data = {
             'action': 'message_sent',
@@ -134,3 +139,56 @@ def send_telegram_message(to_number, message_body):
             'error': str(e),
             'platform': 'telegram'
         }
+
+def log_outbound_message(original_data, send_data, result, answer_to_activity_id):
+    """Log outbound message to DynamoDB after successful sending"""
+    try:
+        dynamodb = boto3.resource('dynamodb')
+        activities_table = dynamodb.Table(os.environ.get('ACTIVITIES_TABLE', ''))
+        activity_content_table = dynamodb.Table(os.environ.get('ACTIVITY_CONTENT_TABLE', ''))
+        
+        if not activities_table or not activity_content_table:
+            logger.warning("DynamoDB tables not configured for message logging")
+            return
+        
+        timestamp = datetime.now().isoformat()
+        activity_id = str(uuid.uuid4())
+        
+        # Create outbound activity record
+        activities_table.put_item(
+            Item={
+                'id': activity_id,
+                'lead_id': original_data.get('lead_id', ''),
+                'contact_method_id': original_data.get('contact_method_id', ''),
+                'activity_type': send_data.get('platform', 'unknown'),
+                'status': 'completed',
+                'direction': 'outbound',
+                'completed_at': timestamp,
+                'created_at': timestamp,
+                'metadata': {
+                    'messageSid': result.get('message_id', ''),
+                    'platform': send_data.get('platform', 'unknown'),
+                    'messageType': 'text',
+                    'answer_to_activity_id': answer_to_activity_id
+                }
+            }
+        )
+        
+        # Store outbound activity content (only the assistant message)
+        activity_content_table.put_item(
+            Item={
+                'id': str(uuid.uuid4()),
+                'activity_id': activity_id,
+                'content_type': send_data.get('platform', 'unknown'),
+                'content': {
+                    'assistantMessage': send_data.get('message', '')
+                },
+                'created_at': timestamp,
+            }
+        )
+        
+        logger.info(f"Logged outbound message activity: {activity_id}")
+        
+    except Exception as e:
+        logger.warning(f"Error logging outbound message: {str(e)}")
+        # Don't fail the main operation if logging fails
