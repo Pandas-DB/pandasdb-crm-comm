@@ -268,9 +268,9 @@ resources:
                   Resource:
                     - !GetAtt CheckContentLambdaFunction.Arn
                     - !GetAtt CheckPhoneSpammerLambdaFunction.Arn
-                    - !GetAtt SpamDetectionLambdaFunction.Arn
-                    - !GetAtt HandleSpamLambdaFunction.Arn
-                    - !GetAtt HandleNormalMessageLambdaFunction.Arn
+                    - !GetAtt DetectSpamLambdaFunction.Arn
+                    - !GetAtt GenerateSpamResponseLambdaFunction.Arn
+                    - !GetAtt GenerateAiResponseLambdaFunction.Arn
                     - !GetAtt SendMessageLambdaFunction.Arn
 
     # Step Functions State Machine

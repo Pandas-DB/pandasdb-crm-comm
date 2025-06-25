@@ -4,8 +4,8 @@
   "description": "PandasDB CRM Communication System using AWS Lambda, Step Functions, and Supabase",
   "scripts": {
     "deploy": "serverless deploy",
-    "deploy:dev": "npm run upload-config && npm run upload-knowledge && dotenv -e .env -- serverless deploy --stage dev",
-    "deploy:prod": "npm run upload-config && npm run upload-knowledge && dotenv -e .env -- serverless deploy --stage prod",
+    "deploy:dev": "npm run upload-config && npm run upload-knowledge && dotenv npx serverless deploy --stage dev",
+    "deploy:prod": "npm run upload-config && npm run upload-knowledge && dotenv npx serverless deploy --stage prod",
     "remove": "serverless remove",
     "logs": "serverless logs -f",
     "invoke": "serverless invoke -f",
@@ -14,11 +14,12 @@
     "upload-config": "aws s3 cp config/business.json s3://$(aws cloudformation describe-stacks --stack-name pandasdb-crm-comm-dev --query 'Stacks[0].Outputs[?OutputKey==`KnowledgeBaseBucket`].OutputValue' --output text)/config/business.json"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
+    "dotenv-cli": "^7.4.2",
     "serverless": "^3.38.0",
     "serverless-dotenv-plugin": "^4.0.2",
     "serverless-python-requirements": "^6.0.0",
-    "serverless-step-functions": "^3.19.0",
-    "dotenv-cli": "^7.4.2"
+    "serverless-step-functions": "^3.19.0"
   },
   "author": "Your Name",
   "license": "MIT"
