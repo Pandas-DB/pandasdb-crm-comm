@@ -162,6 +162,10 @@ def parse_and_normalize_whatsapp(event) -> NormalizedInputMessage:
         logger.warning("Invalid Twilio signature - request rejected")
         return None
     
+    # Extract main fields and put the rest in metadata
+    main_fields = {'From', 'To', 'Body', 'MessageSid', 'ProfileName', 'AccountSid'}
+    metadata = {k: v for k, v in webhook_data.items() if k not in main_fields}
+    
     # Create normalized message object
     return NormalizedInputMessage(
         From=webhook_data.get('From', '').replace('whatsapp:', ''),  # Remove prefix
@@ -171,7 +175,7 @@ def parse_and_normalize_whatsapp(event) -> NormalizedInputMessage:
         ProfileName=webhook_data.get('ProfileName', 'Unknown User'),
         AccountSid=webhook_data.get('AccountSid', ''),
         platform='whatsapp',
-        metadata={}
+        metadata=metadata
     )
 
 def parse_and_normalize_telegram(event) -> NormalizedInputMessage:
