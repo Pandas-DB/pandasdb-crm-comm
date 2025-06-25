@@ -42,3 +42,13 @@ webhookHandler:
           parameters:
             querystrings:
               platform: true
+
+leadsApi:
+  handler: src/handlers/leads_api.lambda_handler
+  name: ${self:service}-${self:provider.stage}-leads-api
+  description: Create and manage leads with contact methods
+  events:
+    - http:
+        path: /api/leads
+        method: post
+        cors: true

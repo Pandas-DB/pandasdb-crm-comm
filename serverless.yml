@@ -20,6 +20,7 @@ provider:
     ACTIVITY_CONTENT_TABLE: !Ref ActivityContentTable
     SPAM_ACTIVITIES_TABLE: !Ref SpamActivitiesTable
     STATE_MACHINE_NAME: ${self:service}-${self:provider.stage}-processor
+    API_TOKEN: ${env:API_TOKEN}
     
     DEFAULT_PLATFORM: whatsapp
     TWILIO_ACCOUNT_SID: ${env:TWILIO_ACCOUNT_SID}
@@ -285,6 +286,10 @@ resources:
     WebhookUrl:
       Description: "Webhook URL for Twilio"
       Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/webhook/whatsapp"
+    
+    LeadsApiUrl:
+      Description: "API URL for Lead Management"
+      Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/api/leads"
     
     KnowledgeBaseBucket:
       Description: "S3 Bucket for Knowledge Base"

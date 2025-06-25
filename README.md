@@ -522,6 +522,127 @@ Goal: Schedule meetings while answering questions
 2. **AI Analysis**: Platform-aware spam detection + response generation
 3. **Outgoing**: Response → Platform-specific sender → Platform delivery
 
+### **📋 Leads Management API**
+
+**Programmatic Lead Creation and Contact Management**
+- ✅ **Token-Authenticated**: Secure API access with Bearer token authentication
+- ✅ **Flexible Lead Creation**: Create new leads or add contacts to existing ones
+- ✅ **Multi-Contact Support**: Add multiple contact methods (phone, email, other) in one request
+- ✅ **Automatic Validation**: Prevents duplicate contacts and validates data integrity
+- ✅ **Primary Contact Detection**: Automatically marks first contact as primary
+
+**API Features**
+- **RESTful Design**: Standard HTTP methods with JSON payloads
+- **CORS Enabled**: Ready for web application integration
+- **Error Handling**: Comprehensive error responses with clear messages
+- **Data Integrity**: Validates contact method types and prevents duplicates
+- **Settings Management**: Automatically creates contact preferences
+
+**Endpoint Configuration**
+```yaml
+# Deployed automatically with your CRM system
+POST /api/leads
+Authorization: Bearer YOUR_API_TOKEN
+Content-Type: application/json
+```
+
+**Usage Examples**
+
+*Create new lead with multiple contacts:*
+```bash
+curl -X POST https://your-api-domain.com/api/leads \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -d '{
+    "name": "John Doe",
+    "metadata": {
+      "source": "website",
+      "campaign": "lead-gen-2024"
+    },
+    "contact_methods": [
+      {
+        "type": "phone",
+        "value": "+1234567890"
+      },
+      {
+        "type": "email",
+        "value": "john.doe@example.com"
+      }
+    ]
+  }'
+```
+
+*Add contacts to existing lead:*
+```bash
+curl -X POST https://your-api-domain.com/api/leads \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -d '{
+    "lead_id": "123e4567-e89b-12d3-a456-426614174000",
+    "contact_methods": [
+      {
+        "type": "other",
+        "value": "telegram:@johndoe"
+      }
+    ]
+  }'
+```
+
+**API Response Format**
+```json
+{
+  "success": true,
+  "lead": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "name": "John Doe",
+    "metadata": {
+      "source": "website",
+      "campaign": "lead-gen-2024"
+    },
+    "created_at": "2025-06-25T10:30:00.000Z",
+    "updated_at": "2025-06-25T10:30:00.000Z"
+  },
+  "contact_methods": [
+    {
+      "id": "456e7890-e89b-12d3-a456-426614174001",
+      "type": "phone",
+      "value": "+1234567890",
+      "is_primary": true,
+      "is_active": true
+    }
+  ],
+  "total_contact_methods": 1
+}
+```
+
+**Integration Use Cases**
+- **Website Forms**: Automatically create leads from contact forms
+- **CRM Integration**: Sync leads from external systems
+- **Bulk Import**: Programmatically import existing contact databases
+- **Third-party Webhooks**: Receive leads from marketing platforms
+- **Manual Entry**: Build custom admin interfaces for lead management
+
+**Security & Configuration**
+```bash
+# Add to your .env file
+API_TOKEN=your-secure-api-token-here
+
+# Deploy with updated environment
+npm run deploy:dev
+```
+
+**Supported Contact Types**
+- `phone`: Phone numbers (including international formats)
+- `email`: Email addresses
+- `other`: Any other contact method (social media, messengers, etc.)
+
+**Error Handling**
+- **400 Bad Request**: Invalid data format or missing required fields
+- **401 Unauthorized**: Missing or invalid API token
+- **404 Not Found**: Lead ID not found (when adding to existing lead)
+- **409 Conflict**: Contact method already exists in system
+- **500 Internal Server Error**: System error with detailed logging
+
 ### **💾 Data Management**
 
 **DynamoDB Schema**
