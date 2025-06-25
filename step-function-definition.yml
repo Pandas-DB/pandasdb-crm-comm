@@ -48,12 +48,12 @@ States:
     Choices:
       - Variable: "$.body.is_spammer"
         BooleanEquals: true
-        Next: HandleSpamMessage
-    Default: SpamDetection
+        Next: GenerateSpamResponse
+    Default: DetectSpam
   
-  SpamDetection:
+  DetectSpam:
     Type: Task
-    Resource: !GetAtt SpamDetectionLambdaFunction.Arn
+    Resource: !GetAtt DetectSpamLambdaFunction.Arn
     Next: IsSpamMessage
     Retry:
       - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
@@ -62,7 +62,7 @@ States:
         BackoffRate: 2.0
     Catch:
       - ErrorEquals: ["States.ALL"]
-        Next: HandleNormalMessage
+        Next: GenerateAiResponse
         Comment: "If spam detection fails, treat as normal message"
   
   IsSpamMessage:
@@ -70,13 +70,13 @@ States:
     Choices:
       - Variable: "$.body.is_spam"
         BooleanEquals: true
-        Next: HandleSpamMessage
-    Default: HandleNormalMessage
+        Next: GenerateSpamResponse
+    Default: GenerateAiResponse
   
-  HandleSpamMessage:
+  GenerateSpamResponse:
     Type: Task
-    Resource: !GetAtt HandleSpamLambdaFunction.Arn
-    Next: SendSpamResponse  # CHANGED: Send response instead of direct success
+    Resource: !GetAtt GenerateSpamResponseLambdaFunction.Arn
+    Next: SendSpamResponse
     Retry:
       - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
         IntervalSeconds: 2
@@ -87,10 +87,10 @@ States:
         Next: ProcessingFailed
         ResultPath: "$.error"
   
-  HandleNormalMessage:
+  GenerateAiResponse:
     Type: Task
-    Resource: !GetAtt HandleNormalMessageLambdaFunction.Arn
-    Next: SendNormalResponse  # CHANGED: Send response instead of direct success
+    Resource: !GetAtt GenerateAiResponseLambdaFunction.Arn
+    Next: SendNormalResponse
     Retry:
       - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
         IntervalSeconds: 2
@@ -120,21 +120,4 @@ States:
     Resource: !GetAtt SendMessageLambdaFunction.Arn
     Next: MessageProcessed
     Retry:
-      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
-        IntervalSeconds: 2
-        MaxAttempts: 3
-        BackoffRate: 2.0
-    Catch:
-      - ErrorEquals: ["States.ALL"]
-        Next: MessageProcessed
-        Comment: "Continue even if message sending fails"
-  
-  SpamProcessed:
-    Type: Succeed
-  
-  MessageProcessed:
-    Type: Succeed
-  
-  ProcessingFailed:
-    Type: Fail
-    Cause: "Message processing failed"
+      - ErrorEquals: ["Lambda.ServiceException", "L

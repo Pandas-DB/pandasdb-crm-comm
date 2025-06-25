@@ -43,7 +43,7 @@ def lambda_handler(event, context):
         
         timestamp = datetime.now().isoformat()
         
-        # Create spam activity record
+        # Create inbound spam activity record
         activity_id = str(uuid.uuid4())
         activities_table.put_item(
             Item={
@@ -62,6 +62,19 @@ def lambda_handler(event, context):
                     'spam_reason': spam_reason,
                     'platform': platform
                 }
+            }
+        )
+        
+        # Store inbound activity content (only the lead message)
+        activity_content_table.put_item(
+            Item={
+                'id': str(uuid.uuid4()),
+                'activity_id': activity_id,
+                'content_type': platform,
+                'content': {
+                    'leadMessage': message_body
+                },
+                'created_at': timestamp
             }
         )
         
@@ -103,21 +116,6 @@ def lambda_handler(event, context):
             response_message = config['spam_messages']['warning_message_es']
             action_type = "warning"
         
-        # Store activity content
-        activity_content_table.put_item(
-            Item={
-                'id': str(uuid.uuid4()),
-                'activity_id': activity_id,
-                'content_type': platform,
-                'content': {
-                    'leadMessage': message_body,
-                    'assistantMessage': response_message,
-                    'action': action_type
-                },
-                'created_at': timestamp
-            }
-        )
-        
         response_data = {
             'action': 'spam_handled',
             'activity_id': activity_id,
@@ -130,7 +128,8 @@ def lambda_handler(event, context):
                 'platform': platform,
                 'to': clean_phone_number,
                 'message': response_message,
-                'from': original_to
+                'from': original_to,
+                'answer_to_activity_id': activity_id
             }
         }
         

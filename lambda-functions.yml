@@ -8,20 +8,20 @@ checkPhoneSpammer:
   name: ${self:service}-${self:provider.stage}-check-phone-spammer
   description: Check phone exists and spammer status
   
-spamDetection:
-  handler: src/handlers/spam_detection.lambda_handler
-  name: ${self:service}-${self:provider.stage}-spam-detection
+detectSpam:
+  handler: src/handlers/detect_spam.lambda_handler
+  name: ${self:service}-${self:provider.stage}-detect-spam
   description: AI-powered spam detection using Bedrock
   
-handleSpam:
-  handler: src/handlers/handle_spam.lambda_handler
-  name: ${self:service}-${self:provider.stage}-handle-spam
-  description: Handle spam messages and responses
+generateSpamResponse:
+  handler: src/handlers/generate_spam_response.lambda_handler
+  name: ${self:service}-${self:provider.stage}-generate-spam-response
+  description: Generate spam warning/blocking responses
   
-handleNormalMessage:
-  handler: src/handlers/handle_normal_message.lambda_handler
-  name: ${self:service}-${self:provider.stage}-handle-normal-message
-  description: Handle normal messages with AI agent
+generateAiResponse:
+  handler: src/handlers/generate_ai_response.lambda_handler
+  name: ${self:service}-${self:provider.stage}-generate-ai-response
+  description: Generate AI responses for normal messages
 
 sendMessage:
   handler: src/handlers/send_message.lambda_handler
