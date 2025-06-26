@@ -285,9 +285,17 @@ resources:
         Definition: ${file(step-function-definition.yml)}
 
   Outputs:
-    WebhookUrl:
-      Description: "Webhook URL for Twilio"
-      Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/webhook/whatsapp"
+    WhatsAppWebhookUrl:
+      Description: "Webhook URL for Twilio WhatsApp"
+      Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/whatsapp"
+    
+    TelegramWebhookUrl:
+      Description: "Webhook URL for Telegram"
+      Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/telegram"
+    
+    ChatApiUrl:
+      Description: "API URL for Chat"
+      Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/chat"
     
     LeadsApiUrl:
       Description: "API URL for Lead Management"

@@ -1,50 +1,68 @@
 checkContent:
-  handler: src/handlers/check_content.lambda_handler
+  handler: src/handlers/common/check_content.lambda_handler
   name: ${self:service}-${self:provider.stage}-check-content
   description: Check if WhatsApp message has content
   
 checkPhoneSpammer:
-  handler: src/handlers/check_phone_spammer.lambda_handler
+  handler: src/handlers/common/check_phone_spammer.lambda_handler
   name: ${self:service}-${self:provider.stage}-check-phone-spammer
   description: Check phone exists and spammer status
   
 detectSpam:
-  handler: src/handlers/detect_spam.lambda_handler
+  handler: src/handlers/common/detect_spam.lambda_handler
   name: ${self:service}-${self:provider.stage}-detect-spam
   description: AI-powered spam detection using Bedrock
   
 generateSpamResponse:
-  handler: src/handlers/generate_spam_response.lambda_handler
+  handler: src/handlers/common/generate_spam_response.lambda_handler
   name: ${self:service}-${self:provider.stage}-generate-spam-response
   description: Generate spam warning/blocking responses
   
 generateAiResponse:
-  handler: src/handlers/generate_ai_response.lambda_handler
+  handler: src/handlers/common/generate_ai_response.lambda_handler
   name: ${self:service}-${self:provider.stage}-generate-ai-response
   description: Generate AI responses for normal messages
 
 sendMessage:
-  handler: src/handlers/send_message.lambda_handler
+  handler: src/handlers/common/send_message.lambda_handler
   name: ${self:service}-${self:provider.stage}-send-message
   description: Send messages through various platforms (WhatsApp, Telegram, etc.)
   
-webhookHandler:
-  handler: src/handlers/webhook_handler.lambda_handler
+whatsappWebhook:
+  handler: src/handlers/phone/whatsapp_webhook.lambda_handler
   reservedConcurrency: 10
-  name: ${self:service}-${self:provider.stage}-webhook-handler
-  description: Handle webhooks from various platforms and start Step Functions
+  name: ${self:service}-${self:provider.stage}-whatsapp-webhook
+  description: Handle WhatsApp webhooks from Twilio
   events:
     - http:
-        path: /webhook/phone
+        path: /whatsapp
         method: post
         cors: true
-        request:
-          parameters:
-            querystrings:
-              platform: true
+
+telegramWebhook:
+  handler: src/handlers/phone/telegram_webhook.lambda_handler
+  reservedConcurrency: 10
+  name: ${self:service}-${self:provider.stage}-telegram-webhook
+  description: Handle Telegram bot webhooks
+  events:
+    - http:
+        path: /telegram
+        method: post
+        cors: true
+
+chatApi:
+  handler: src/handlers/api/chat_api.lambda_handler
+  name: ${self:service}-${self:provider.stage}-chat-api
+  description: Handle chat API requests with API key authentication
+  events:
+    - http:
+        path: /chat
+        method: post
+        cors: true
+        private: true
 
 leadsApi:
-  handler: src/handlers/leads_api.lambda_handler
+  handler: src/handlers/api/leads_api.lambda_handler
   name: ${self:service}-${self:provider.stage}-leads-api
   description: Create and manage leads with contact methods
   events:
