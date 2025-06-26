@@ -54,12 +54,35 @@ def lambda_handler(event, context):
     
     try:
         # Get platform from query parameter (REQUIRED)
-        platform = event.get('queryStringParameters', {}).get('platform')
+        query_params = event.get('queryStringParameters') or {}
+        platform = query_params.get('platform')
         if not platform:
             return {
                 'statusCode': 400,
                 'body': json.dumps({'error': 'Platform parameter is required'})
             }
+        
+        # Check if platform=chat requires API key authentication
+        if platform == 'chat':
+            headers = event.get('headers') or {}
+            api_key = headers.get('x-api-key') or headers.get('X-API-Key')
+            
+            if not api_key:
+                logger.warning("Chat platform request missing API key")
+                return {
+                    'statusCode': 401,
+                    'body': json.dumps({'error': 'API key required for chat platform'})
+                }
+            
+            # Validate API key against AWS API Gateway
+            if not validate_api_key(api_key):
+                logger.warning(f"Invalid API key provided: {api_key[:10]}...")
+                return {
+                    'statusCode': 401,
+                    'body': json.dumps({'error': 'Invalid API key'})
+                }
+            
+            logger.info("Chat platform request authorized with valid API key")
             
         logger.info(f"Processing webhook for platform: {platform}")
         
@@ -69,6 +92,8 @@ def lambda_handler(event, context):
                 normalized_message = parse_and_normalize_whatsapp(event)
             elif platform == 'telegram':
                 normalized_message = parse_and_normalize_telegram(event)
+            elif platform == 'chat':
+                normalized_message = parse_and_normalize_chat(event)
             else:
                 logger.error(f"Unsupported platform: {platform}")
                 return {
@@ -121,10 +146,17 @@ def lambda_handler(event, context):
                 'headers': {'Content-Type': 'application/json'},
                 'body': json.dumps({'ok': True})
             }
+        elif platform == 'chat':
+            return {
+                'statusCode': 200,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'status': 'received'})
+            }
         
     except Exception as e:
         logger.error(f"Error processing webhook: {str(e)}", exc_info=True)
         # Return platform-appropriate error response
+        platform = event.get('queryStringParameters', {}).get('platform', 'unknown')
         if platform == 'whatsapp':
             return {
                 'statusCode': 200,
@@ -137,6 +169,27 @@ def lambda_handler(event, context):
                 'headers': {'Content-Type': 'application/json'},
                 'body': json.dumps({'ok': True})
             }
+
+def validate_api_key(api_key):
+    """
+    Validate API key against AWS API Gateway.
+    Returns True if valid, False otherwise.
+    """
+    try:
+        client = boto3.client('apigateway')
+        
+        # Get all API keys and check if the provided key exists
+        response = client.get_api_keys()
+        
+        for key_info in response.get('items', []):
+            if key_info.get('value') == api_key:
+                # Check if key is enabled
+                return key_info.get('enabled', False)
+        
+        return False
+    except Exception as e:
+        logger.error(f"Error validating API key: {str(e)}")
+        return False
 
 def parse_and_normalize_whatsapp(event) -> NormalizedInputMessage:
     """Parse WhatsApp webhook and return normalized message object"""
@@ -178,6 +231,36 @@ def parse_and_normalize_whatsapp(event) -> NormalizedInputMessage:
         metadata=metadata
     )
 
+def parse_and_normalize_chat(event) -> NormalizedInputMessage:
+    """Parse chat platform webhook and return normalized message object"""
+    body = event.get('body', '')
+    if event.get('isBase64Encoded'):
+        import base64
+        body = base64.b64decode(body).decode('utf-8')
+    
+    # Parse JSON body for chat platform
+    try:
+        chat_data = json.loads(body) if body else {}
+    except json.JSONDecodeError:
+        # If not JSON, treat body as plain text message
+        chat_data = {'message': body}
+    
+    # Extract main fields and put the rest in metadata
+    main_fields = {'from', 'to', 'message', 'text', 'id', 'name'}
+    metadata = {k: v for k, v in chat_data.items() if k.lower() not in main_fields}
+    
+    # Create normalized message object for chat platform
+    return NormalizedInputMessage(
+        From=chat_data.get('from', 'chat_user'),
+        To=chat_data.get('to', 'chat_bot'),
+        Body=chat_data.get('message', '') or chat_data.get('text', ''),
+        MessageSid=chat_data.get('id', f"chat_{hash(body)}"),
+        ProfileName=chat_data.get('name', 'Chat User'),
+        AccountSid='chat_account',
+        platform='chat',
+        metadata=metadata
+    )
+
 def parse_and_normalize_telegram(event) -> NormalizedInputMessage:
     """Parse Telegram webhook and return normalized message object"""
     body = event.get('body', '')
@@ -190,6 +273,10 @@ def parse_and_normalize_telegram(event) -> NormalizedInputMessage:
     chat = message.get('chat', {})
     from_user = message.get('from', {})
     
+    # Extract main fields and put the rest in metadata
+    main_fields = {'message_id', 'text', 'chat', 'from'}
+    metadata = {k: v for k, v in telegram_data.items() if k not in main_fields}
+    
     # Create normalized message object
     return NormalizedInputMessage(
         From=str(chat.get('id', '')),
@@ -199,14 +286,5 @@ def parse_and_normalize_telegram(event) -> NormalizedInputMessage:
         ProfileName=f"{from_user.get('first_name', '')} {from_user.get('last_name', '')}".strip() or 'Telegram User',
         AccountSid='telegram_account',
         platform='telegram',
-        metadata={
-            'chat_id': chat.get('id'),
-            'chat_type': chat.get('type', 'private'),
-            'user_id': from_user.get('id'),
-            'username': from_user.get('username', ''),
-            'language_code': from_user.get('language_code', ''),
-            'is_bot': from_user.get('is_bot', False),
-            'message_date': message.get('date'),
-            'raw_data': telegram_data
-        }
+        metadata=metadata
     )
