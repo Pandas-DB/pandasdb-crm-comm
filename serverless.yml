@@ -20,7 +20,6 @@ provider:
     ACTIVITY_CONTENT_TABLE: !Ref ActivityContentTable
     SPAM_ACTIVITIES_TABLE: !Ref SpamActivitiesTable
     STATE_MACHINE_NAME: ${self:service}-${self:provider.stage}-processor
-    API_TOKEN: ${env:API_TOKEN}
     
     DEFAULT_PLATFORM: whatsapp
     TWILIO_ACCOUNT_SID: ${env:TWILIO_ACCOUNT_SID}
@@ -73,6 +72,9 @@ provider:
             - !Sub "${ContactMethodsTable.Arn}/index/*"
             - !Sub "${ActivitiesTable.Arn}/index/*"
             - !Sub "${SpamActivitiesTable.Arn}/index/*"
+  
+  apiKeys:
+    - name: ${self:service}-${self:provider.stage}-api-key
 
 functions: ${file(lambda-functions.yml)}
 

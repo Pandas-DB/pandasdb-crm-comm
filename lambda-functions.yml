@@ -52,3 +52,4 @@ leadsApi:
         path: /api/leads
         method: post
         cors: true
+        private: true
