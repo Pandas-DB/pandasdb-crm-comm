@@ -2,7 +2,13 @@ import json
 import logging
 import boto3
 import os
+import sys
 from botocore.exceptions import ClientError
+
+# Add the src directory to Python path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+
+from aux import load_business_config
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -14,15 +20,13 @@ def lambda_handler(event, context):
     """
     
     try:
-        # Parse input from previous lambda
-        if isinstance(event.get('body'), str):
-            input_data = json.loads(event.get('body'))
-        else:
-            input_data = event.get('body', event)
-            
-        message_data = input_data.get('message_data', {})
-        message_body = message_data.get('message_body', '')
-        is_existing_spammer = input_data.get('is_spammer', False)
+        # Parse input from previous lambda - the event IS the input data
+        input_data = event
+        
+        # Extract mandatory fields - no defaults, will raise KeyError if missing
+        flow_input = input_data['flow_input']
+        message_body = flow_input['Body']
+        is_existing_spammer = input_data['is_spammer']
         
         logger.info(f"Analyzing message for spam: {message_body[:100]}...")
         
@@ -30,12 +34,10 @@ def lambda_handler(event, context):
         if is_existing_spammer:
             logger.info("User already flagged as spammer, skipping AI check")
             return {
-                'body': {
-                    'is_spam': True,
-                    'spam_reason': 'existing_spammer',
-                    'confidence': 1.0,
-                    **input_data
-                }
+                'is_spam': True,
+                'spam_reason': 'existing_spammer',
+                'confidence': 1.0,
+                **input_data
             }
         
         # Initialize Bedrock client - USE CORRECT REGION!
@@ -44,7 +46,7 @@ def lambda_handler(event, context):
         
         bedrock_runtime = boto3.client(
             service_name='bedrock-runtime',
-            region_name=aws_region  # ✅ NOW USING CORRECT REGION
+            region_name=aws_region
         )
         
         # Prepare the prompt for spam detection
@@ -118,28 +120,22 @@ def lambda_handler(event, context):
             **input_data
         }
         
-        return {
-            'body': response_data
-        }
+        return response_data
         
     except ClientError as e:
         logger.error(f"Bedrock client error: {str(e)}")
         # Fallback: return non-spam if Bedrock fails
         return {
-            'body': {
-                'is_spam': False,
-                'spam_reason': 'bedrock_error',
-                'confidence': 0.0,
-                'error': str(e),
-                **input_data
-            }
+            'is_spam': False,
+            'spam_reason': 'bedrock_error',
+            'confidence': 0.0,
+            'error': str(e),
+            **input_data
         }
         
     except Exception as e:
         logger.error(f"Error in spam detection: {str(e)}")
         return {
-            'body': {
-                'action': 'error',
-                'error': str(e)
-            }
+            'action': 'error',
+            'error': str(e)
         }

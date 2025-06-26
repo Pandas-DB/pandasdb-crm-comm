@@ -4,6 +4,10 @@ import boto3
 import os
 from datetime import datetime
 import uuid
+import sys
+
+# Add the src directory to Python path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from aux import load_business_config
 
