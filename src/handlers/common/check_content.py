@@ -32,7 +32,8 @@ def lambda_handler(event, context):
         
         # Return the SAME flow_input data unchanged
         return {
-            'flow_input': flow_input
+            'flow_input': flow_input,
+            'action': 'continue'
         }
         
     except Exception as e:

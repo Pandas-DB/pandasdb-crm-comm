@@ -18,10 +18,10 @@ States:
  HasContent:
    Type: Choice
    Choices:
-     - Variable: "$.body.action"
+     - Variable: "$.action"
        StringEquals: "stop"
        Next: MessageEmpty
-     - Variable: "$.body.action"
+     - Variable: "$.action"
        StringEquals: "continue"
        Next: CheckPhoneAndSpammer
    Default: ProcessingFailed
@@ -46,7 +46,7 @@ States:
  CheckIfExistingSpammer:
    Type: Choice
    Choices:
-     - Variable: "$.body.is_spammer"
+     - Variable: "$.is_spammer"
        BooleanEquals: true
        Next: GenerateSpamResponse
    Default: DetectSpam
@@ -68,7 +68,7 @@ States:
  IsSpamMessage:
    Type: Choice
    Choices:
-     - Variable: "$.body.is_spam"
+     - Variable: "$.is_spam"
        BooleanEquals: true
        Next: GenerateSpamResponse
    Default: GenerateAiResponse

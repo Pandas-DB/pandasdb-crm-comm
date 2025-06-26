@@ -84,7 +84,7 @@ def lambda_handler(event, context):
         # Call Bedrock
         response = bedrock_runtime.invoke_model(
             body=json.dumps(body),
-            modelId=modelId=config['ai_models']['bedrock_model_id'],
+            modelId=config['ai_models']['bedrock_model_id'],
             accept='application/json',
             contentType='application/json'
         )

@@ -2,9 +2,13 @@ import json
 import logging
 import boto3
 import os
+import sys
 from datetime import datetime, timedelta
 import uuid
 from botocore.exceptions import ClientError
+
+# Add the src directory to Python path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from aux import load_business_config
 
@@ -68,7 +72,7 @@ def lambda_handler(event, context):
             config = load_business_config()
 
             spam_count_in_days_window = len(spam_response['Items'])
-            is_spammer = spam_count_in_days_window >= config['spam_detection']['spam_threshold_30_days']
+            is_spammer = spam_count_in_days_window >= config['spam_detection']['spam_threshold_days_window']
             
             # Check daily message volume
             today = datetime.now().date().isoformat()
@@ -90,7 +94,7 @@ def lambda_handler(event, context):
             elif daily_message_count >= config['spam_detection']['daily_message_warning_threshold']:  # 40 by default
                 logger.warning(f"Lead {lead_id} approaching spam limit: {daily_message_count} messages today")
             
-            logger.info(f"Spammer status: {is_spammer}, 30-day count: {spam_count_in_days_window}, daily count: {daily_message_count}")
+            logger.info(f"Spammer status: {is_spammer}, N-day count: {spam_count_in_days_window}, daily count: {daily_message_count}")
             
             response_data = {
                 'action': 'existing_user',
