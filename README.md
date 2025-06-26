@@ -10,7 +10,7 @@
 
 Transform your business communications with intelligent automation across multiple platforms. This serverless system handles lead capture, conversation management, spam filtering, and sales engagement - all powered by AWS Bedrock AI.
 
-**Supported Platforms**: WhatsApp, Telegram (and easily extensible for more)
+**Supported Platforms**: WhatsApp, Telegram, Chat API (and easily extensible for more)
 
 ---
 
@@ -48,7 +48,7 @@ Transform your business communications with intelligent automation across multip
 ### **🚀 Production-Ready Features**
 - **Intelligent Spam Detection**: AI-powered filtering with 95%+ accuracy
 - **Automated Sales Agent**: Context-aware responses with conversation history
-- **Multi-Platform Support**: WhatsApp, Telegram, and easily extensible
+- **Multi-Platform Support**: WhatsApp, Telegram, Chat API, and easily extensible
 - **Scalable Architecture**: Handle 1K to 1M+ messages per month
 - **Cost-Effective**: Pay only for what you use
 - **Real-time Analytics**: Comprehensive monitoring and lead insights
@@ -97,8 +97,9 @@ npm run deploy:dev
 # npm run upload-knowledge
 
 # 5. Configure platform webhooks (use URLs from deployment output)
-# WhatsApp: https://your-api-id.execute-api.region.amazonaws.com/dev/webhook/phone?platform=whatsapp
-# Telegram: https://your-api-id.execute-api.region.amazonaws.com/dev/webhook/phone?platform=telegram
+# WhatsApp: https://your-api-id.execute-api.region.amazonaws.com/dev/whatsapp
+# Telegram: https://your-api-id.execute-api.region.amazonaws.com/dev/telegram
+# Chat API: https://your-api-id.execute-api.region.amazonaws.com/dev/chat
 ```
 
 ### **🎯 Optional: Deploy Monitoring Backoffice**
@@ -124,7 +125,7 @@ cd backoffice
 | **100K messages** | 20K | $52.15 | $467.50 | **$519.65** | $0.026 | $0.0052 |
 | **1M messages** | 200K | $485.20 | $4,675.00 | **$5,160.20** | $0.026 | $0.0052 |
 
-*Platform costs shown for WhatsApp via Twilio. Telegram is free for bots.
+*Platform costs shown for WhatsApp via Twilio. Telegram and Chat API are free.
 
 ### **AWS Services Breakdown (10K messages/month)**
 | Service | Monthly Cost | Purpose |
@@ -133,10 +134,10 @@ cd backoffice
 | **Step Functions** | $1.50 | Workflow orchestration |
 | **Bedrock AI** | $2.91 | Spam detection + AI responses |
 | **DynamoDB** | $2.20 | Lead and activity storage |
-| **API Gateway** | $0.03 | Webhook endpoint |
+| **API Gateway** | $0.03 | Webhook endpoints |
 | **CloudWatch** | $0.31 | Monitoring and logs |
 
-> **💡 Pro Tip**: 85% of costs come from WhatsApp messaging. Telegram is free, making it a cost-effective alternative. AWS infrastructure scales efficiently with excellent cost-per-message economics.
+> **💡 Pro Tip**: 85% of costs come from WhatsApp messaging. Telegram and Chat API are free, making them cost-effective alternatives. AWS infrastructure scales efficiently with excellent cost-per-message economics.
 
 ---
 
@@ -162,12 +163,17 @@ AWS_DEFAULT_REGION=us-east-1
 
 **WhatsApp Setup**:
 1. Create Twilio account and get WhatsApp Business API access
-2. Set webhook URL: `https://your-api.com/webhook/phone?platform=whatsapp`
+2. Set webhook URL: `https://your-api.com/whatsapp`
 
 **Telegram Setup**:
 1. Create bot via [@BotFather](https://t.me/botfather)
 2. Get bot token and add to environment variables
-3. Set webhook: `curl -X POST "https://api.telegram.org/bot{BOT_TOKEN}/setWebhook" -d "url=https://your-api.com/webhook/phone?platform=telegram"`
+3. Set webhook: `curl -X POST "https://api.telegram.org/bot{BOT_TOKEN}/setWebhook" -d "url=https://your-api.com/telegram"`
+
+**Chat API Setup**:
+1. Use the provided API key from deployment output
+2. Send POST requests to: `https://your-api.com/chat`
+3. Include `X-API-Key` header for authentication
 
 ### **AI Knowledge Base Customization**
 
@@ -210,24 +216,34 @@ Adjust settings in `config/business.json`:
 
 ### **Current Protection Settings**
 
-Your webhook endpoint has built-in protection against abuse and excessive requests:
+Your webhook endpoints have built-in protection against abuse and excessive requests:
 
-~~~yaml
+```yaml
 # Current limits in lambda-functions.yml
-webhookHandler:
- reservedConcurrency: 10    # Max 10 concurrent Lambda executions
- events:
-   - http:
-       path: /webhook/phone
-       method: post
-       request:
-         parameters:
-           querystrings:
-             platform: true  # Required platform parameter
-       throttle:
-         rate: 10           # 10 requests per second
-         burst: 20          # 20 concurrent requests max
-~~~
+whatsappWebhook:
+  reservedConcurrency: 10    # Max 10 concurrent Lambda executions
+  events:
+    - http:
+        path: /whatsapp
+        method: post
+        throttle:
+          rate: 10           # 10 requests per second
+          burst: 20          # 20 concurrent requests max
+
+telegramWebhook:
+  reservedConcurrency: 10
+  events:
+    - http:
+        path: /telegram
+        method: post
+
+chatApi:
+  events:
+    - http:
+        path: /chat
+        method: post
+        private: true        # Requires API key authentication
+```
 
 ### **Cost Protection Analysis**
 
@@ -237,16 +253,16 @@ With these limits, the **maximum daily cost** from malicious attacks is capped a
 
 Modify `lambda-functions.yml` to adjust protection levels:
 
-~~~yaml
-webhookHandler:
- handler: src/handlers/webhook_handler.lambda_handler
- reservedConcurrency: 50    # Increase for higher traffic
- events:
-   - http:
-       throttle:
-         rate: 100          # Requests per second
-         burst: 200         # Concurrent request burst
-~~~
+```yaml
+whatsappWebhook:
+  handler: src/handlers/phone/whatsapp_webhook.lambda_handler
+  reservedConcurrency: 50    # Increase for higher traffic
+  events:
+    - http:
+        throttle:
+          rate: 100          # Requests per second
+          burst: 200         # Concurrent request burst
+```
 
 ### **Recommended Settings by Usage**
 
@@ -262,6 +278,7 @@ webhookHandler:
 - **Platform Signature Validation**: Rejects invalid requests (Twilio, Telegram)
 - **API Gateway Rate Limiting**: Prevents traffic spikes
 - **Lambda Concurrency Limits**: Controls resource usage
+- **API Key Authentication**: Secure access for Chat API
 - **CloudWatch Monitoring**: Tracks unusual patterns
 
 **⚠️ Important**: After changing limits, redeploy with `npm run deploy:dev`
@@ -272,11 +289,11 @@ webhookHandler:
 
 ### **Adding a New Lambda Function**
 
-1. **Create the handler**: Add new Python file in `src/handlers/`
+1. **Create the handler**: Add new Python file in appropriate `src/handlers/` subdirectory
 2. **Update lambda-functions.yml**: Add function definition
    ```yaml
    newFunction:
-     handler: src/handlers/new_function.lambda_handler
+     handler: src/handlers/common/new_function.lambda_handler
      name: ${self:service}-${self:provider.stage}-new-function
      description: Description of new function
    ```
@@ -285,9 +302,10 @@ webhookHandler:
 
 ### **Adding a New Platform**
 
-1. **Update webhook_handler.py**: Add platform parsing logic
-2. **Update send_message.py**: Add platform sending implementation
-3. **Test with new webhook URL**: `https://your-api.com/webhook/phone?platform=newplatform`
+1. **Create webhook handler**: Add new file in `src/handlers/phone/`
+2. **Update lambda-functions.yml**: Add webhook endpoint
+3. **Import shared utilities**: Use `from handlers_aux import ...` for common functions
+4. **Test with new webhook URL**: `https://your-api.com/newplatform`
 
 ### **Removing a Lambda Function**
 
@@ -320,6 +338,7 @@ NewProcessingStep:
 ### **Important Notes**
 - Always update both the Lambda definition AND the Step Function workflow when adding/removing functions
 - Lambda function names in Step Functions use the format: `{FunctionName}LambdaFunction.Arn`
+- Use shared utilities from `handlers_aux.py` to avoid code duplication
 - Test changes in dev environment before production: `npm run deploy:dev`
 
 ---
@@ -336,14 +355,23 @@ pandasdb-crm-comm/
 ├── .env.example                      # Environment variables template
 ├── config/
 │   └── business.json                 # Business logic configuration (spam rules, AI settings)
-├── src/handlers/                     # Lambda function source code
-│   ├── webhook_handler.py            # Multi-platform webhook router
-│   ├── check_content.py
-│   ├── check_phone_spammer.py
-│   ├── spam_detection.py
-│   ├── handle_spam.py
-│   ├── handle_normal_message.py
-│   └── send_message.py               # Multi-platform message sender
+├── src/
+│   ├── aux.py                        # General utilities
+│   ├── handlers_aux.py               # Shared webhook utilities and common functions
+│   └── handlers/                     # Lambda function source code
+│       ├── api/                      # API endpoints
+│       │   ├── chat_api.py           # Chat API with authentication
+│       │   └── leads_api.py          # Lead management API
+│       ├── common/                   # Shared processing functions
+│       │   ├── check_content.py
+│       │   ├── check_phone_spammer.py
+│       │   ├── detect_spam.py
+│       │   ├── generate_ai_response.py
+│       │   ├── generate_spam_response.py
+│       │   └── send_message.py       # Multi-platform message sender
+│       └── phone/                    # Platform-specific webhooks
+│           ├── whatsapp_webhook.py   # WhatsApp via Twilio
+│           └── telegram_webhook.py   # Telegram Bot API
 ├── knowledge/
 │   └── system_prompt.txt             # AI knowledge base
 ├── database/
@@ -398,7 +426,7 @@ graph TB
 - **⚡ Lambda Functions**: Serverless compute
 - **💾 DynamoDB**: NoSQL database for leads and activities
 - **🧠 Bedrock AI**: Claude 3 for spam detection and sales responses
-- **📱 Multi-Platform Integration**: WhatsApp, Telegram, extensible architecture
+- **📱 Multi-Platform Integration**: WhatsApp, Telegram, Chat API, extensible architecture
 - **📊 Optional Backoffice**: Web-based monitoring interface
 
 ---
@@ -430,14 +458,20 @@ npm run deploy:dev
 cd backoffice && ./scripts/test-deployment.sh dev
 
 # Test WhatsApp endpoint
-curl -X POST "https://your-api.com/webhook/phone?platform=whatsapp" \
+curl -X POST "https://your-api.com/whatsapp" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "From=whatsapp:+1234567890&To=whatsapp:+14155238886&Body=Test message"
 
 # Test Telegram endpoint
-curl -X POST "https://your-api.com/webhook/phone?platform=telegram" \
+curl -X POST "https://your-api.com/telegram" \
   -H "Content-Type: application/json" \
   -d '{"message":{"chat":{"id":123},"from":{"first_name":"Test"},"text":"Hello"}}'
+
+# Test Chat API endpoint
+curl -X POST "https://your-api.com/chat" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"message":"Hello from chat","from":"test_user"}'
 ```
 
 ### **Performance Testing**
@@ -494,7 +528,7 @@ curl -X POST "https://your-api.com/webhook/phone?platform=telegram" \
 ```yaml
 # Customizable via S3 knowledge base
 Model: Claude 3 Haiku (cost-optimized)
-Response Limit: 199 characters (optimal for all platforms). You can change this in src/handlers/handle_normal_message.py
+Response Limit: 199 characters (optimal for all platforms). You can change this in src/handlers/common/generate_ai_response.py
 Tone: Professional, enthusiastic, sales-focused
 Goal: Schedule meetings while answering questions
 ```
@@ -509,16 +543,17 @@ Goal: Schedule meetings while answering questions
 **Supported Platforms**
 - ✅ **WhatsApp**: Text messages, media, contact capture, status tracking
 - ✅ **Telegram**: Text messages, user information, bot commands
+- ✅ **Chat API**: Direct API integration with authentication
 - 🔧 **Extensible**: Easy to add Discord, SMS, Facebook Messenger, etc.
 
 **Platform Features**
-- **Unified API**: Single endpoint with platform parameter
-- **Normalized Data**: All platforms converted to common format
+- **Dedicated Endpoints**: Separate optimized endpoints per platform
+- **Normalized Data**: All platforms converted to common format via `handlers_aux.py`
 - **Platform-Specific**: Maintains platform-specific metadata
 - **Routing**: Automatic platform detection and response routing
 
 **Message Flow**
-1. **Incoming**: Platform → Webhook → API Gateway → Processing
+1. **Incoming**: Platform → Dedicated Webhook → API Gateway → Processing
 2. **AI Analysis**: Platform-aware spam detection + response generation
 3. **Outgoing**: Response → Platform-specific sender → Platform delivery
 
@@ -667,7 +702,7 @@ npm run deploy:dev
 ### **Data Protection**
 - **Encryption**: All data encrypted in transit and at rest
 - **Access Control**: IAM roles with least privilege
-- **API Security**: Rate limiting and CORS protection
+- **API Security**: Rate limiting, CORS protection, and API key authentication
 - **PII Handling**: Minimal data collection, compliant storage
 
 ### **Infrastructure Security**
@@ -679,6 +714,7 @@ npm run deploy:dev
 ### **Platform Compliance**
 - **WhatsApp**: Uses official WhatsApp Business API, respects rate limits
 - **Telegram**: Follows Telegram Bot API guidelines
+- **Chat API**: Token-based authentication with secure key management
 - **Message Templates**: Support for approved templates where required
 - **Opt-out Handling**: Automatic unsubscribe management
 
@@ -786,8 +822,11 @@ npm run remove-infra
 3. **Platform-Specific Issues**
    ```bash
    # Review platform-specific logs
-   aws logs filter-log-events --log-group-name /aws/lambda/webhook-handler \
-     --filter-pattern "platform=telegram"
+   aws logs filter-log-events --log-group-name /aws/lambda/whatsapp-webhook \
+     --filter-pattern "WhatsApp"
+   
+   aws logs filter-log-events --log-group-name /aws/lambda/telegram-webhook \
+     --filter-pattern "Telegram"
    ```
 
 ### **Backup & Recovery**
@@ -836,6 +875,7 @@ git push origin feature/your-feature-name
 - **Logging**: Structured logging with correlation IDs
 - **Security**: Validate all inputs, use least privilege
 - **Platform Agnostic**: Design for multiple platforms from the start
+- **Code Reuse**: Use `handlers_aux.py` for shared functionality
 
 ### **Contributing**
 
