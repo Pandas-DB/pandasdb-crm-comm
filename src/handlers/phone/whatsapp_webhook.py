@@ -7,7 +7,7 @@ import sys
 sys.path.append('/opt/python')
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from webhook_utils import (
+from handlers_aux import (
     NormalizedInputMessage, 
     start_step_function_execution, 
     get_platform_success_response,
