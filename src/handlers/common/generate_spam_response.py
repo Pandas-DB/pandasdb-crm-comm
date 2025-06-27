@@ -4,6 +4,10 @@ import boto3
 import os
 from datetime import datetime, timedelta
 import uuid
+import sys
+
+# Add the src directory to Python path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from aux import load_business_config
 
@@ -106,7 +110,7 @@ def lambda_handler(event, context):
         )
         
         spam_count_window_days = len(spam_response['Items'])
-        is_spammer = spam_count_window_days >= config['spam_detection']['spam_threshold_30_days']
+        is_spammer = spam_count_window_days >= config['spam_detection']['spam_threshold_days_window']
         
         # Determine response message based on spam count
         if is_spammer:
