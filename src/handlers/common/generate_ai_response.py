@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 import uuid
 import sys
+import re
 
 # Add the src directory to Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -136,23 +137,22 @@ def lambda_handler(event, context):
         response_body = json.loads(response.get('body').read())
         ai_response = response_body.get('content', [{}])[0].get('text', '')
         
-        # Ensure response is within character limit
-        if len(ai_response) > config['message_limits']['character_limit_fallback']:
-            ai_response = ai_response[:config['message_limits']['character_limit_truncate']] + "..."
-            
+        # Split message if it's too long (> N characters)
+        max_length = config['message_limits']['character_limit_fallback']
+        ai_responses = split_message_by_stops(ai_response, max_length)
         
         logger.info(f"AI generated response: {ai_response}")
         
         response_data = {
             'action': 'message_processed',
             'activity_id': activity_id,
-            'ai_response': ai_response,
+            'ai_response': ai_responses,
             'conversation_history_count': len(conversation_history),
             'flow_input': flow_input,
             'send_message': {
                 'platform': platform,
                 'to': clean_phone_number,
-                'message': ai_response,
+                'messages': ai_responses,
                 'from': original_to,
                 'answer_to_activity_id': activity_id
             }
@@ -168,6 +168,55 @@ def lambda_handler(event, context):
             'action': 'error',
             'error': str(e)
         }
+
+def split_message_by_stops(message, max_length):
+    """
+    Split a message into multiple parts by stops when it exceeds max_length.
+    Returns a list of messages.
+    """
+    if len(message) <= max_length:
+        return [message]
+    
+    # Define stop patterns (sentence endings)
+    stop_patterns = ['. ', '! ', '? ', '.\n', '!\n', '?\n']
+    
+    messages = []
+    current_message = ""
+    
+    # Split the message into sentences
+    sentences = re.split(r'([.!?])', message)
+    
+    i = 0
+    while i < len(sentences):
+        part = sentences[i]
+        
+        # Reconstruct sentence with punctuation
+        if i + 1 < len(sentences) and sentences[i + 1] in ['.', '!', '?']:
+            part += sentences[i + 1]
+            i += 2
+        else:
+            i += 1
+        
+        # Check if adding this part would exceed max_length
+        if len(current_message + part) > max_length:
+            if current_message:
+                messages.append(current_message.strip())
+                current_message = part
+            else:
+                # Single part is too long, force split by characters
+                messages.append(part[:max_length])
+                current_message = part[max_length:]
+        else:
+            current_message += part
+    
+    # Add remaining content
+    if current_message.strip():
+        messages.append(current_message.strip())
+    
+    # Filter out empty messages
+    messages = [msg for msg in messages if msg.strip()]
+    
+    return messages
 
 def get_conversation_history(lead_id):
     """Get conversation history for the lead"""

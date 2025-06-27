@@ -4,6 +4,8 @@ import boto3
 import os
 from datetime import datetime
 import uuid
+import time
+import random
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -12,6 +14,7 @@ def lambda_handler(event, context):
     """
     Lambda function to send messages through different platforms.
     Currently supports WhatsApp (via Twilio), designed to be extended for Telegram, etc.
+    Now handles both single messages and lists of messages.
     """
     
     try:
@@ -19,37 +22,68 @@ def lambda_handler(event, context):
         send_message_data = event.get('send_message', {})
         platform = send_message_data.get('platform', 'whatsapp')
         to_number = send_message_data.get('to', '')
-        message_body = send_message_data.get('message', '')
         from_number = send_message_data.get('from', '')
         answer_to_activity_id = send_message_data.get('answer_to_activity_id', '')
         
-        logger.info(f"Sending message via {platform} to {to_number}: {message_body[:100]}")
-        
-        # Route to appropriate platform handler
-        if platform == 'whatsapp':
-            result = send_whatsapp_message(to_number, message_body, from_number)
-        elif platform == 'telegram':
-            result = send_telegram_message(to_number, message_body)
+        # Handle both single message and list of messages
+        if 'messages' in send_message_data:
+            messages = send_message_data.get('messages', [])
         else:
-            logger.error(f"Unsupported platform: {platform}")
+            # Fallback to single message format
+            single_message = send_message_data.get('message', '')
+            messages = [single_message] if single_message else []
+        
+        if not messages:
+            logger.error("No messages to send")
             return {
                 'action': 'error',
-                'error': f'Unsupported platform: {platform}'
+                'error': 'No messages to send'
             }
         
-        # Store outbound activity and content ONLY after successful sending
-        if result.get('success'):
-            log_outbound_message(event, send_message_data, result, answer_to_activity_id)
+        logger.info(f"Sending {len(messages)} message(s) via {platform} to {to_number}")
+        
+        results = []
+        sent_count = 0
+        
+        for i, message_body in enumerate(messages):
+            if not message_body.strip():
+                continue
+                
+            logger.info(f"Sending message {i+1}/{len(messages)}: {message_body[:100]}")
+            
+            # Route to appropriate platform handler
+            if platform == 'whatsapp':
+                result = send_whatsapp_message(to_number, message_body, from_number)
+            elif platform == 'telegram':
+                result = send_telegram_message(to_number, message_body)
+            else:
+                logger.error(f"Unsupported platform: {platform}")
+                return {
+                    'action': 'error',
+                    'error': f'Unsupported platform: {platform}'
+                }
+            
+            results.append(result)
+            
+            # Store outbound activity and content ONLY after successful sending
+            if result.get('success'):
+                log_outbound_message(event, send_message_data, result, answer_to_activity_id, message_body)
+                sent_count += 1
         
         response_data = {
             'action': 'message_sent',
             'platform': platform,
-            'success': result.get('success', False),
-            'message_id': result.get('message_id'),
-            'error': result.get('error')
+            'total_messages': len(messages),
+            'sent_messages': sent_count,
+            'success': sent_count > 0,
+            'all_sent': sent_count == len(messages),
+            'results': results
         }
         
-        logger.info(f"Message sent successfully via {platform}: {result.get('message_id')}")
+        if sent_count == len(messages):
+            logger.info(f"All {len(messages)} messages sent successfully via {platform}")
+        else:
+            logger.warning(f"Only {sent_count}/{len(messages)} messages sent successfully via {platform}")
         
         return response_data
         
@@ -140,7 +174,7 @@ def send_telegram_message(to_number, message_body):
             'platform': 'telegram'
         }
 
-def log_outbound_message(original_data, send_data, result, answer_to_activity_id):
+def log_outbound_message(original_data, send_data, result, answer_to_activity_id, message_content):
     """Log outbound message to DynamoDB after successful sending"""
     try:
         dynamodb = boto3.resource('dynamodb')
@@ -181,7 +215,7 @@ def log_outbound_message(original_data, send_data, result, answer_to_activity_id
                 'activity_id': activity_id,
                 'content_type': send_data.get('platform', 'unknown'),
                 'content': {
-                    'assistantMessage': send_data.get('message', '')
+                    'assistantMessage': message_content
                 },
                 'created_at': timestamp,
             }
