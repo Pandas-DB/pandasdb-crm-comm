@@ -72,9 +72,6 @@ provider:
             - !Sub "${ContactMethodsTable.Arn}/index/*"
             - !Sub "${ActivitiesTable.Arn}/index/*"
             - !Sub "${SpamActivitiesTable.Arn}/index/*"
-  
-  apiKeys:
-    - name: ${self:service}-${self:provider.stage}-api-key
 
 functions: ${file(lambda-functions.yml)}
 
@@ -94,8 +91,25 @@ resources:
           RateLimit: 10      # 10 requests per second
           BurstLimit: 20     # 20 concurrent requests max
         Quota:
-          Limit: 10000       # 86400 requests per day (optional)
+          Limit: 10000       # 10000 requests per day
           Period: DAY
+
+    CrmApiKey:
+      Type: AWS::ApiGateway::ApiKey
+      Properties:
+        Name: ${self:service}-${self:provider.stage}-api-key
+        Description: API Key for CRM Communication System
+        Enabled: true
+
+    ApiUsagePlanKey:
+      Type: AWS::ApiGateway::UsagePlanKey
+      DependsOn:
+        - CrmApiKey
+        - ApiUsagePlan
+      Properties:
+        KeyId: !Ref CrmApiKey
+        KeyType: API_KEY
+        UsagePlanId: !Ref ApiUsagePlan
 
     # DynamoDB Tables
     LeadsTable:
