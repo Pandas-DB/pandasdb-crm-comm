@@ -12,31 +12,11 @@ dynamodb = boto3.resource('dynamodb')
 LEADS_TABLE = os.environ['LEADS_TABLE']
 CONTACT_METHODS_TABLE = os.environ['CONTACT_METHODS_TABLE']
 CONTACT_METHOD_SETTINGS_TABLE = os.environ['CONTACT_METHOD_SETTINGS_TABLE']
-API_TOKEN = os.environ.get('API_TOKEN')
 
 # Initialize tables
 leads_table = dynamodb.Table(LEADS_TABLE)
 contact_methods_table = dynamodb.Table(CONTACT_METHODS_TABLE)
 contact_method_settings_table = dynamodb.Table(CONTACT_METHOD_SETTINGS_TABLE)
-
-def validate_token(event):
-    """Validate API token from Authorization header"""
-    if not API_TOKEN:
-        return False
-    
-    headers = event.get('headers', {})
-    auth_header = headers.get('Authorization') or headers.get('authorization')
-    
-    if not auth_header:
-        return False
-    
-    # Support both "Bearer token" and "token" formats
-    if auth_header.startswith('Bearer '):
-        token = auth_header[7:]
-    else:
-        token = auth_header
-    
-    return token == API_TOKEN
 
 def create_response(status_code, body, headers=None):
     """Create standardized API response"""
@@ -146,9 +126,8 @@ def lambda_handler(event, context):
     if event.get('httpMethod') == 'OPTIONS':
         return create_response(200, {})
     
-    # Validate authentication
-    if not validate_token(event):
-        return create_response(401, {'error': 'Unauthorized'})
+    # API key authentication is already handled by API Gateway
+    # If the request reaches this function, the API key is valid
     
     try:
         # Parse request body

@@ -2,46 +2,33 @@ import json
 import logging
 import os
 import sys
+
 sys.path.append('/opt/python')
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from webhook_utils import (
+from handlers_aux import (
     NormalizedInputMessage, 
-    validate_api_key,
     start_step_function_execution, 
     get_platform_success_response,
     get_platform_error_response,
     handle_webhook_error
 )
 
-
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
 
 def lambda_handler(event, context):
     """
     Chat webhook handler for web chat platform messages.
-    Requires API key authentication.
+    API key authentication is handled by API Gateway.
     """
     
     try:
         logger.info("Processing Chat webhook")
         
-        # Check API key authentication for chat platform
-        headers = event.get('headers') or {}
-        api_key = headers.get('x-api-key') or headers.get('X-API-Key')
-        
-        if not api_key:
-            logger.warning("Chat platform request missing API key")
-            return get_platform_error_response('chat', 'API key required for chat platform', 401)
-        
-        # Validate API key against AWS API Gateway
-        if not validate_api_key(api_key):
-            logger.warning(f"Invalid API key provided: {api_key[:10]}...")
-            return get_platform_error_response('chat', 'Invalid API key', 401)
-        
-        logger.info("Chat platform request authorized with valid API key")
+        # API key authentication is already handled by API Gateway
+        # If the request reaches this function, the API key is valid
+        logger.info("Chat platform request authorized by API Gateway")
         
         # Parse and normalize chat webhook data
         try:
@@ -62,7 +49,6 @@ def lambda_handler(event, context):
         
     except Exception as e:
         return handle_webhook_error('chat', e)
-
 
 def parse_and_normalize_chat(event) -> NormalizedInputMessage:
     """Parse chat platform webhook and return normalized message object"""
