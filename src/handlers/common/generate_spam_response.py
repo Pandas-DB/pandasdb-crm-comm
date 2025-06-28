@@ -1,3 +1,4 @@
+import yaml
 import json
 import logging
 import boto3
@@ -24,12 +25,12 @@ def lambda_handler(event, context):
         # Parse input from previous lambda
         flow_input = event.get('flow_input', {})
         if isinstance(flow_input, str):
-            flow_input = json.loads(flow_input)
+            flow_input = yaml.safe_load(flow_input)
             
         lead_id = event.get('lead_id')
         contact_method_id = event.get('contact_method_id')
         spam_reason = event.get('spam_reason', 'AI detected spam')
-        platform = flow_input.get('platform')
+        platform = flow_input['platform']
         
         clean_phone_number = flow_input.get('From', '')
         message_body = flow_input.get('Body', '')
@@ -97,22 +98,27 @@ def lambda_handler(event, context):
         
         config = load_business_config()
         
-        # Get current spam count to determine response (last N days, by default 30)
-        lookback_days = config['spam_detection']['spam_lookback_days']
-        lookback_date = (datetime.now() - timedelta(days=lookback_days)).isoformat()
-        spam_response = spam_activities_table.query(
-            IndexName='lead-id-spam-date-index',
-            KeyConditionExpression='lead_id = :lead_id AND spam_date >= :date',
-            ExpressionAttributeValues={
-                ':lead_id': lead_id,
-                ':date': lookback_date
-            }
-        )
+        # Check spam activities limits to determine if user is spammer
+        spam_activities_limits = config['spam_detection']['spam_activities_limits']
+        is_spammer = False
         
-        spam_count_window_days = len(spam_response['Items'])
-        is_spammer = spam_count_window_days >= config['spam_detection']['spam_threshold_days_window']
+        for days, max_spam_activities in spam_activities_limits:
+            lookback_date = (datetime.now() - timedelta(days=days)).isoformat()
+            spam_response = spam_activities_table.query(
+                IndexName='lead-id-spam-date-index',
+                KeyConditionExpression='lead_id = :lead_id AND spam_date >= :date',
+                ExpressionAttributeValues={
+                    ':lead_id': lead_id,
+                    ':date': lookback_date
+                }
+            )
+            
+            spam_count = len(spam_response['Items'])
+            if spam_count >= max_spam_activities:
+                is_spammer = True
+                break
         
-        # Determine response message based on spam count
+        # Determine response message based on spam status
         if is_spammer:
             response_message = config['spam_messages']['blocked_message_es']
             action_type = "blocked"
@@ -125,7 +131,6 @@ def lambda_handler(event, context):
             'activity_id': activity_id,
             'response_message': response_message,
             'action_type': action_type,
-            'spam_count': spam_count_window_days + 1,
             'is_blocked': is_spammer,
             'flow_input': flow_input,
             'send_message': {

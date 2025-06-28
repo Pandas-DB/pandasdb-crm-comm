@@ -3,10 +3,15 @@ checkContent:
   name: ${self:service}-${self:provider.stage}-check-content
   description: Check if WhatsApp message has content
   
-checkPhoneSpammer:
-  handler: src/handlers/common/check_phone_spammer.lambda_handler
-  name: ${self:service}-${self:provider.stage}-check-phone-spammer
-  description: Check phone exists and spammer status
+getOrCreateLead:
+  handler: src/handlers/common/get_or_create_lead.lambda_handler
+  name: ${self:service}-${self:provider.stage}-get-or-create-lead
+  description: Get existing lead or create new lead with contact method
+  
+checkLeadSpammer:
+  handler: src/handlers/common/check_lead_spammer.lambda_handler
+  name: ${self:service}-${self:provider.stage}-check-lead-spammer
+  description: Check if lead is spammer based on activities
   
 detectSpam:
   handler: src/handlers/common/detect_spam.lambda_handler
