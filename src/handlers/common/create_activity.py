@@ -15,6 +15,7 @@ logger.setLevel(logging.INFO)
 def lambda_handler(event, context):
     """
     Lambda function to store inbound activity and activity content.
+    Handles both normal and spam activities.
     """
     
     try:
@@ -27,21 +28,38 @@ def lambda_handler(event, context):
         contact_method_id = event.get('contact_method_id')
         platform = flow_input['platform']
         
+        # Spam-related fields (optional)
+        is_spam = event.get('is_spam', False)
+        spam_reason = event.get('spam_reason', '')
+        
         message_body = flow_input.get('Body', '')
         message_sid = flow_input.get('MessageSid', '')
         profile_name = flow_input.get('ProfileName', '')
         
-        logger.info(f"Storing activity for lead {lead_id}: {message_body[:100]}")
+        logger.info(f"Storing activity for lead {lead_id}: {message_body[:100]} (spam: {is_spam})")
         
         # DynamoDB client
         dynamodb = boto3.resource('dynamodb')
         activities_table = dynamodb.Table(os.environ['ACTIVITIES_TABLE'])
         activity_content_table = dynamodb.Table(os.environ['ACTIVITY_CONTENT_TABLE'])
+        spam_activities_table = dynamodb.Table(os.environ['SPAM_ACTIVITIES_TABLE'])
         
         timestamp = datetime.now().isoformat()
         
         # Create inbound activity record
         activity_id = str(uuid.uuid4())
+        activity_metadata = {
+            'messageSid': message_sid,
+            'profileName': profile_name,
+            'messageType': 'text',
+            'platform': platform
+        }
+        
+        # Add spam-specific metadata if it's spam
+        if is_spam:
+            activity_metadata['spam'] = 'True'
+            activity_metadata['spam_reason'] = spam_reason
+        
         activities_table.put_item(
             Item={
                 'id': activity_id,
@@ -52,12 +70,7 @@ def lambda_handler(event, context):
                 'direction': 'inbound',
                 'completed_at': timestamp,
                 'created_at': timestamp,
-                'metadata': {
-                    'messageSid': message_sid,
-                    'profileName': profile_name,
-                    'messageType': 'text',
-                    'platform': platform
-                }
+                'metadata': activity_metadata
             }
         )
         
@@ -74,12 +87,28 @@ def lambda_handler(event, context):
             }
         )
         
+        # If it's spam, also create spam_activities record
+        if is_spam:
+            spam_activities_table.put_item(
+                Item={
+                    'id': str(uuid.uuid4()),
+                    'activity_id': activity_id,
+                    'lead_id': lead_id,
+                    'flagged_by': 'bot',
+                    'spam_reason': spam_reason,
+                    'spam_date': timestamp,
+                    'created_at': timestamp
+                }
+            )
+        
         logger.info(f"Activity stored successfully for lead {lead_id}")
         
         response_data = {
             'activity_id': activity_id,
             'lead_id': lead_id,
             'contact_method_id': contact_method_id,
+            'is_spam': is_spam,
+            'spam_reason': spam_reason,
             'flow_input': flow_input
         }
         

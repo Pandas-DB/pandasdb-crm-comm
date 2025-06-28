@@ -84,13 +84,13 @@ States:
     Choices:
       - Variable: "$.is_spam"
         BooleanEquals: true
-        Next: GenerateSpamResponse
+        Next: CreateActivity
     Default: CreateActivity
   
   CreateActivity:
     Type: Task
     Resource: !GetAtt CreateActivityLambdaFunction.Arn
-    Next: GenerateResponse
+    Next: CheckActivityType
     Retry:
       - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
         IntervalSeconds: 2
@@ -100,6 +100,14 @@ States:
       - ErrorEquals: ["States.ALL"]
         Next: ProcessingFailed
         ResultPath: "$.error"
+  
+  CheckActivityType:
+    Type: Choice
+    Choices:
+      - Variable: "$.is_spam"
+        BooleanEquals: true
+        Next: GenerateSpamResponse
+    Default: GenerateResponse
   
   GenerateResponse:
     Type: Task

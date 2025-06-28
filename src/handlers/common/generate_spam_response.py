@@ -1,10 +1,8 @@
 import yaml
-import json
 import logging
 import boto3
 import os
 from datetime import datetime, timedelta
-import uuid
 import sys
 
 # Add the src directory to Python path for imports
@@ -17,8 +15,8 @@ logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     """
-    Lambda function to handle spam messages.
-    Stores spam activity and prepares response for messaging service.
+    Lambda function to generate spam response messages.
+    Determines if user should be blocked or warned based on spam history.
     """
     
     try:
@@ -28,73 +26,17 @@ def lambda_handler(event, context):
             flow_input = yaml.safe_load(flow_input)
             
         lead_id = event.get('lead_id')
-        contact_method_id = event.get('contact_method_id')
-        spam_reason = event.get('spam_reason', 'AI detected spam')
+        activity_id = event.get('activity_id')
         platform = flow_input['platform']
         
         clean_phone_number = flow_input.get('From', '')
-        message_body = flow_input.get('Body', '')
-        message_sid = flow_input.get('MessageSid', '')
-        profile_name = flow_input.get('ProfileName', '')
         original_to = flow_input.get('To', '')
         
-        logger.info(f"Handling spam message for lead {lead_id} on {platform}")
+        logger.info(f"Generating spam response for lead {lead_id} on {platform}")
         
         # DynamoDB client
         dynamodb = boto3.resource('dynamodb')
-        activities_table = dynamodb.Table(os.environ['ACTIVITIES_TABLE'])
         spam_activities_table = dynamodb.Table(os.environ['SPAM_ACTIVITIES_TABLE'])
-        activity_content_table = dynamodb.Table(os.environ['ACTIVITY_CONTENT_TABLE'])
-        
-        timestamp = datetime.now().isoformat()
-        
-        # Create inbound spam activity record
-        activity_id = str(uuid.uuid4())
-        activities_table.put_item(
-            Item={
-                'id': activity_id,
-                'lead_id': lead_id,
-                'contact_method_id': contact_method_id,
-                'activity_type': platform,
-                'status': 'completed',
-                'direction': 'inbound',
-                'completed_at': timestamp,
-                'created_at': timestamp,
-                'metadata': {
-                    'messageSid': message_sid,
-                    'profileName': profile_name,
-                    'spam': 'True',
-                    'spam_reason': spam_reason,
-                    'platform': platform
-                }
-            }
-        )
-        
-        # Store inbound activity content (only the lead message)
-        activity_content_table.put_item(
-            Item={
-                'id': str(uuid.uuid4()),
-                'activity_id': activity_id,
-                'content_type': platform,
-                'content': {
-                    'leadMessage': message_body
-                },
-                'created_at': timestamp
-            }
-        )
-        
-        # Create spam_activities record
-        spam_activities_table.put_item(
-            Item={
-                'id': str(uuid.uuid4()),
-                'activity_id': activity_id,
-                'lead_id': lead_id,
-                'flagged_by': 'bot',
-                'spam_reason': spam_reason,
-                'spam_date': timestamp,
-                'created_at': timestamp
-            }
-        )
         
         config = load_business_config()
         
@@ -142,12 +84,12 @@ def lambda_handler(event, context):
             }
         }
         
-        logger.info(f"Spam handled successfully for lead {lead_id} on {platform}")
+        logger.info(f"Spam response generated successfully for lead {lead_id} on {platform}")
         
         return response_data
         
     except Exception as e:
-        logger.error(f"Error handling spam: {str(e)}")
+        logger.error(f"Error generating spam response: {str(e)}")
         return {
             'action': 'error',
             'error': str(e)
