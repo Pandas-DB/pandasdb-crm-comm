@@ -14,89 +14,6 @@ Transform your business communications with intelligent automation across multip
 
 ---
 
-## 🤝 Contributing
-
-### **Development Workflow**
-
-```bash
-# 1. Fork and clone
-git clone https://github.com/your-username/pandasdb-crm-comm.git
-cd pandasdb-crm-comm
-
-# 2. Create feature branch
-git checkout -b feature/your-feature-name
-
-# 3. Make changes and test
-npm run deploy:dev
-# Test your changes
-
-# 4. Submit pull request
-git push origin feature/your-feature-name
-```
-
-### **Code Standards**
-- **Python**: Follow PEP 8, use type hints
-- **JavaScript**: ES6+, consistent formatting
-- **Documentation**: Update README for new features
-- **Testing**: Add tests for new functionality
-
-### **Architecture Guidelines**
-- **Single Responsibility**: Each Lambda has one purpose
-- **Error Handling**: Graceful degradation and retry logic
-- **Logging**: Structured logging with correlation IDs
-- **Security**: Validate all inputs, use least privilege
-- **Platform Agnostic**: Design for multiple platforms from the start
-- **Code Reuse**: Use `handlers_aux.py` for shared functionality
-
-### **Contributing**
-
-We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
-
-**Ways to Contribute**
-- 🐛 **Bug Reports**: Help us find and fix issues
-- 💻 **Code**: Submit features and improvements
-- 📝 **Documentation**: Improve guides and tutorials
-- 🧪 **Testing**: Help test new features and releases
-- 📱 **New Platforms**: Add support for additional messaging platforms
-
----
-
-## 📄 License & Legal
-
-### **Open Source License**
-This project is licensed under the MIT License - see [LICENSE](./LICENSE) file for details.
-
-### **Commercial Use**
-- ✅ **Free for Commercial Use**: Build and sell solutions
-- ✅ **Modification Rights**: Customize for your needs  
-- ✅ **Distribution Rights**: Share and redistribute
-- ✅ **Private Use**: Use internally in your organization
-
-### **Dependencies**
-- **AWS Services**: Subject to AWS pricing and terms
-- **Platform APIs**: Requires accounts for WhatsApp Business API, Telegram Bot API
-- **Bedrock AI**: Subject to AWS Bedrock terms and pricing
-
-### **Disclaimer**
-This software is provided "as is" without warranty. Users are responsible for compliance with platform terms of service, data protection regulations, and applicable laws.
-
----
-
-### **💬 Questions?**
-
-We're here to help you succeed:
-- 📧 **Contact me**: https://www.linkedin.com/in/sergiortizrodriguez/
-
----
-
-<div align="center">
-
-**🐼 Built with ❤️ by the PandasDB Team**
-
-[⭐ Star on GitHub](https://github.com/your-repo) • [📚 Documentation](./docs/) • [🐛 Report Bug](https://github.com/your-repo/issues) • [💡 Request Feature](https://github.com/your-repo/issues/new?template=feature_request.md)
-
-</div>
-
 ## 📋 Table of Contents
 
 ### **🎯 Getting Started**
@@ -459,7 +376,8 @@ pandasdb-crm-comm/
 │       │   ├── get_or_create_lead.py
 │       │   ├── check_lead_spammer.py
 │       │   ├── detect_spam.py
-│       │   ├── generate_ai_response.py
+│       │   ├── create_activity.py
+│       │   ├── generate_response.py
 │       │   ├── generate_spam_response.py
 │       │   └── send_message.py       # Multi-platform message sender
 │       └── phone/                    # Platform-specific webhooks
@@ -490,40 +408,48 @@ graph TB
     E --> F[Get/Create Lead]
     F --> G[Check Lead Spam]
     
-    G -->|Clean| H[Detect AI Spam]
-    G -->|Spam| I[Spam Handler]
+    G -->|Existing Spammer| H[End Flow]
+    G -->|Clean User| I[Detect AI Spam]
     
-    H -->|Clean| J[AI Sales Agent]
-    H -->|Spam| I
+    I --> J[Create Activity]
+    J --> K[Check Activity Type]
     
-    J --> K[Response Generation]
-    I --> L[Block/Warning]
+    K -->|Spam| L[Generate Spam Response]
+    K -->|Normal| M[Generate AI Response]
     
-    K --> M[Platform Message Sender]
-    L --> M
-    M --> N[Platform APIs]
+    L --> N[Send Spam Response]
+    M --> O[Send Normal Response]
     
-    F --> O[(DynamoDB)]
-    J --> P[Bedrock AI]
-    P --> Q[S3 Knowledge Base]
+    F --> P[(DynamoDB)]
+    M --> Q[Bedrock AI]
+    Q --> R[S3 Knowledge Base]
     
-    R[Optional Backoffice] --> S[CloudFront CDN]
-    S --> T[Real-time Analytics]
+    S[Optional Backoffice] --> T[CloudFront CDN]
+    T --> U[Real-time Analytics]
     
     style A fill:#25D366
-    style P fill:#FF9900
-    style O fill:#3F48CC
-    style R fill:#9D4EDD
-    style M fill:#E74C3C
+    style Q fill:#FF9900
+    style P fill:#3F48CC
+    style S fill:#9D4EDD
+    style H fill:#FF6B6B
 ```
 
 ### **Core Components**
-- **🔄 Step Functions**: Workflow orchestration with split lead management and spam detection
-- **⚡ Lambda Functions**: Serverless compute with dedicated lead creation and spam checking
+- **🔄 Step Functions**: Optimized workflow with efficient spam filtering
+- **⚡ Lambda Functions**: Modular architecture with separated concerns
+  - **Lead Management**: `get_or_create_lead.py` handles lead creation
+  - **Spam Detection**: `check_lead_spammer.py` and `detect_spam.py` for multi-layer filtering
+  - **Activity Storage**: `create_activity.py` handles all message storage
+  - **Response Generation**: Separate `generate_response.py` and `generate_spam_response.py`
 - **💾 DynamoDB**: NoSQL database for leads and activities
 - **🧠 Bedrock AI**: Claude 3 for spam detection and sales responses
 - **📱 Multi-Platform Integration**: WhatsApp, Telegram, Chat API, extensible architecture
 - **📊 Optional Backoffice**: Web-based monitoring interface
+
+### **Efficient Spam Handling**
+- **Existing Spammers**: Immediately terminated (no processing overhead)
+- **New Spam**: Full detection and response with activity tracking
+- **Clean Messages**: Complete AI processing and conversation management
 
 ---
 
@@ -584,11 +510,12 @@ curl -X POST "https://your-api.com/chat" \
 
 ### **🧠 AI-Powered Spam Detection**
 
-**Advanced Machine Learning Pipeline**
-- **Claude 3 Haiku**: Ultra-fast spam classification (< 200ms)
+**Multi-Layer Detection System**
+- **Volume-Based Pre-filtering**: Instant blocking of known spammers (no processing cost)
+- **Claude 3 Haiku**: Ultra-fast spam classification (< 200ms) for new messages
 - **Context Analysis**: Understands conversation patterns across platforms
 - **Behavioral Tracking**: Identifies repeat offenders with configurable time windows
-- **Smart Escalation**: Warning → Temporary block → Permanent block
+- **Smart Escalation**: Warning → Block exactly at threshold
 
 **Detection Criteria**
 ```python
@@ -606,8 +533,10 @@ curl -X POST "https://your-api.com/chat" \
 - **Default Limits**: 50/day, 200/week, 600/month (customizable)
 - **Smart Warnings**: Alert users when approaching limits (configurable offset)
 - **Spam Activities Tracking**: Track repeated violations across time periods
+- **Exact Threshold Blocking**: Users blocked exactly when hitting spam limit (not before or after)
 
 **Spam Management**
+- **Optimized Performance**: Known spammers bypass all processing
 - **Progressive System**: Configurable spam activity limits before blocking
 - **Automatic Appeals**: Email-based error reporting
 - **Analytics**: Track spam patterns and detection accuracy across multiple time periods
@@ -624,7 +553,7 @@ curl -X POST "https://your-api.com/chat" \
 ```yaml
 # Customizable via S3 knowledge base
 Model: Claude 3 Haiku (cost-optimized)
-Response Limit: 199 characters (optimal for all platforms). You can change this in src/handlers/common/generate_ai_response.py
+Response Limit: Platform-specific character limits (configurable per platform)
 Tone: Professional, enthusiastic, sales-focused
 Goal: Schedule meetings while answering questions
 ```
@@ -645,14 +574,15 @@ Goal: Schedule meetings while answering questions
 **Platform Features**
 - **Dedicated Endpoints**: Separate optimized endpoints per platform
 - **Normalized Data**: All platforms converted to common format via `handlers_aux.py`
-- **Platform-Specific**: Maintains platform-specific metadata
+- **Platform-Specific Configuration**: Individual character limits and settings per platform
 - **Routing**: Automatic platform detection and response routing
 
 **Message Flow**
 1. **Incoming**: Platform → Dedicated Webhook → API Gateway → Processing
-2. **Lead Management**: Get/Create Lead → Check Spam Status → AI Analysis
-3. **AI Analysis**: Platform-aware spam detection + response generation
-4. **Outgoing**: Response → Platform-specific sender → Platform delivery
+2. **Lead Management**: Get/Create Lead → Check Spam Status
+3. **Efficient Routing**: Known spammers exit immediately, others continue to AI analysis
+4. **Activity Storage**: All processed messages stored with platform metadata
+5. **Outgoing**: Response → Platform-specific sender → Platform delivery
 
 ### **📋 Leads Management API**
 
@@ -901,17 +831,6 @@ npm run remove-infra
 1. **Messages Not Processing**
    ```bash
    # Check Step Functions executions
-   aws stepfunctions list-executions --state-machine-arn <arn>
-   
-   # View Lambda logs
-   aws logs filter-log-events --log-group-name /aws/lambda/function-name
-   ```
-
-2. **High Costs**
-   ```bash
-   # Monitor Bedrock usage
-   aws bedrock get-model-invocation-job --job-identifier <id>
-   
    # Check DynamoDB consumption
    aws dynamodb describe-table --table-name <table-name>
    ```
@@ -939,3 +858,98 @@ npm run remove-infra
 - **Multi-Region**: Deploy to multiple AWS regions if needed
 
 ---
+
+## 🤝 Contributing
+
+### **Development Workflow**
+
+```bash
+# 1. Fork and clone
+git clone https://github.com/your-username/pandasdb-crm-comm.git
+cd pandasdb-crm-comm
+
+# 2. Create feature branch
+git checkout -b feature/your-feature-name
+
+# 3. Make changes and test
+npm run deploy:dev
+# Test your changes
+
+# 4. Submit pull request
+git push origin feature/your-feature-name
+```
+
+### **Code Standards**
+- **Python**: Follow PEP 8, use type hints
+- **JavaScript**: ES6+, consistent formatting
+- **Documentation**: Update README for new features
+- **Testing**: Add tests for new functionality
+
+### **Architecture Guidelines**
+- **Single Responsibility**: Each Lambda has one purpose
+- **Error Handling**: Graceful degradation and retry logic
+- **Logging**: Structured logging with correlation IDs
+- **Security**: Validate all inputs, use least privilege
+- **Platform Agnostic**: Design for multiple platforms from the start
+- **Code Reuse**: Use `handlers_aux.py` for shared functionality
+
+### **Contributing**
+
+We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
+**Ways to Contribute**
+- 🐛 **Bug Reports**: Help us find and fix issues
+- 💻 **Code**: Submit features and improvements
+- 📝 **Documentation**: Improve guides and tutorials
+- 🧪 **Testing**: Help test new features and releases
+- 📱 **New Platforms**: Add support for additional messaging platforms
+
+---
+
+## 📄 License & Legal
+
+### **Open Source License**
+This project is licensed under the MIT License - see [LICENSE](./LICENSE) file for details.
+
+### **Commercial Use**
+- ✅ **Free for Commercial Use**: Build and sell solutions
+- ✅ **Modification Rights**: Customize for your needs  
+- ✅ **Distribution Rights**: Share and redistribute
+- ✅ **Private Use**: Use internally in your organization
+
+### **Dependencies**
+- **AWS Services**: Subject to AWS pricing and terms
+- **Platform APIs**: Requires accounts for WhatsApp Business API, Telegram Bot API
+- **Bedrock AI**: Subject to AWS Bedrock terms and pricing
+
+### **Disclaimer**
+This software is provided "as is" without warranty. Users are responsible for compliance with platform terms of service, data protection regulations, and applicable laws.
+
+---
+
+### **💬 Questions?**
+
+We're here to help you succeed:
+- 📧 **Contact me**: https://www.linkedin.com/in/sergiortizrodriguez/
+
+---
+
+<div align="center">
+
+**🐼 Built with ❤️ by the PandasDB Team**
+
+[⭐ Star on GitHub](https://github.com/your-repo) • [📚 Documentation](./docs/) • [🐛 Report Bug](https://github.com/your-repo/issues) • [💡 Request Feature](https://github.com/your-repo/issues/new?template=feature_request.md)
+
+</div> stepfunctions list-executions --state-machine-arn <arn>
+   
+   # View Lambda logs
+   aws logs filter-log-events --log-group-name /aws/lambda/function-name
+   ```
+
+2. **High Costs**
+   ```bash
+   # Monitor Bedrock usage
+   aws bedrock get-model-invocation-job --job-identifier <id>
+   
+   # Check DynamoDB consumption
+   aws
