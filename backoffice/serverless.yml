@@ -5,7 +5,7 @@ frameworkVersion: '3'
 provider:
   name: aws
   runtime: python3.9
-  region: ${opt:region, 'us-east-1'}
+  region: ${opt:region, 'eu-west-1'}
   stage: ${opt:stage, 'dev'}
   memorySize: 512
   timeout: 30
@@ -51,9 +51,9 @@ provider:
             - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:custom.mainStackName}-spam-activities/index/*"
 
 functions:
-  # Lead Management
+  # Lead Management - Fixed handler paths to match actual file structure
   createLead:
-    handler: handlers/create_lead.lambda_handler
+    handler: api/create_leads.lambda_handler
     events:
       - http:
           path: api/leads
@@ -62,7 +62,7 @@ functions:
           private: true  # Requires API key
   
   listLeads:
-    handler: handlers/list_leads.lambda_handler
+    handler: api/list_leads.lambda_handler
     events:
       - http:
           path: api/leads
@@ -71,7 +71,7 @@ functions:
           private: true  # Requires API key
   
   getLeadDetails:
-    handler: handlers/get_lead_details.lambda_handler
+    handler: api/get_lead_details.lambda_handler
     events:
       - http:
           path: api/lead/{lead_id}
@@ -81,7 +81,7 @@ functions:
   
   # Analytics
   getDailyAnalytics:
-    handler: handlers/get_daily_analytics.lambda_handler
+    handler: api/get_daily_analytics.lambda_handler
     events:
       - http:
           path: api/analytics/daily
@@ -90,7 +90,7 @@ functions:
           private: true  # Requires API key
   
   getSpamActivities:
-    handler: handlers/get_spam_activities.lambda_handler
+    handler: api/get_spam_activities.lambda_handler
     events:
       - http:
           path: api/spam/activities
@@ -99,7 +99,7 @@ functions:
           private: true  # Requires API key
   
   getSpamUsers:
-    handler: handlers/get_spam_users.lambda_handler
+    handler: api/get_spam_users.lambda_handler
     events:
       - http:
           path: api/spam/users
@@ -108,7 +108,7 @@ functions:
           private: true  # Requires API key
 
   removeSpamActivities:
-    handler: handlers/remove_spam_activities.lambda_handler
+    handler: api/remove_spam_activities.lambda_handler
     events:
       - http:
           path: api/spam/activities/{lead_id}
@@ -135,8 +135,17 @@ resources:
         Value: !Sub '${AWS::StackName}-${AWS::AccountId}-${AWS::Region}-${self:provider.stage}'
 
     # Usage Plan for Rate Limiting and API Key Management
+    # Use proper Serverless-generated resource dependencies
     BackofficeUsagePlan:
       Type: AWS::ApiGateway::UsagePlan
+      DependsOn:
+        - CreateLeadLambdaPermissionApiGateway
+        - ListLeadsLambdaPermissionApiGateway
+        - GetLeadDetailsLambdaPermissionApiGateway
+        - GetDailyAnalyticsLambdaPermissionApiGateway
+        - GetSpamActivitiesLambdaPermissionApiGateway
+        - GetSpamUsersLambdaPermissionApiGateway
+        - RemoveSpamActivitiesLambdaPermissionApiGateway
       Properties:
         UsagePlanName: ${self:service}-${self:provider.stage}-usage-plan
         Description: Usage plan for Backoffice API with rate limiting
@@ -184,6 +193,7 @@ resources:
     # S3 Bucket Policy for CloudFront Access
     BackofficeBucketPolicy:
       Type: AWS::S3::BucketPolicy
+      DependsOn: BackofficeDistribution
       Properties:
         Bucket: !Ref BackofficeBucket
         PolicyDocument:
@@ -213,6 +223,7 @@ resources:
     # CloudFront Distribution for Global CDN
     BackofficeDistribution:
       Type: AWS::CloudFront::Distribution
+      DependsOn: BackofficeOriginAccessControl
       Properties:
         DistributionConfig:
           Enabled: true
