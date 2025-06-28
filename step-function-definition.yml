@@ -62,13 +62,13 @@ States:
     Choices:
       - Variable: "$.is_spammer"
         BooleanEquals: true
-        Next: GenerateSpamResponse
+        Next: SpamProcessed
     Default: DetectSpam
   
   DetectSpam:
     Type: Task
     Resource: !GetAtt DetectSpamLambdaFunction.Arn
-    Next: IsSpamMessage
+    Next: CreateActivity
     Retry:
       - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
         IntervalSeconds: 2
@@ -78,14 +78,6 @@ States:
       - ErrorEquals: ["States.ALL"]
         Next: CreateActivity
         Comment: "If spam detection fails, treat as normal message"
-  
-  IsSpamMessage:
-    Type: Choice
-    Choices:
-      - Variable: "$.is_spam"
-        BooleanEquals: true
-        Next: CreateActivity
-    Default: CreateActivity
   
   CreateActivity:
     Type: Task
