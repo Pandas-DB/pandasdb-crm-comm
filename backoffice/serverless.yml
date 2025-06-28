@@ -7,12 +7,176 @@ provider:
   runtime: python3.9
   region: ${opt:region, 'us-east-1'}
   stage: ${opt:stage, 'dev'}
+  memorySize: 512
+  timeout: 30
   
+  environment:
+    # Import table names from main stack
+    LEADS_TABLE: 
+      Fn::ImportValue: ${self:custom.mainStackName}-LeadsTable
+    CONTACT_METHODS_TABLE:
+      Fn::ImportValue: ${self:custom.mainStackName}-ContactMethodsTable
+    CONTACT_METHOD_SETTINGS_TABLE:
+      Fn::ImportValue: ${self:custom.mainStackName}-ContactMethodSettingsTable
+    ACTIVITIES_TABLE:
+      Fn::ImportValue: ${self:custom.mainStackName}-ActivitiesTable
+    ACTIVITY_CONTENT_TABLE:
+      Fn::ImportValue: ${self:custom.mainStackName}-ActivityContentTable
+    SPAM_ACTIVITIES_TABLE:
+      Fn::ImportValue: ${self:custom.mainStackName}-SpamActivitiesTable
+  
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: arn:aws:logs:*:*:*
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:Scan
+          Resource: 
+            - Fn::ImportValue: ${self:custom.mainStackName}-LeadsTableArn
+            - Fn::ImportValue: ${self:custom.mainStackName}-ContactMethodsTableArn
+            - Fn::ImportValue: ${self:custom.mainStackName}-ContactMethodSettingsTableArn
+            - Fn::ImportValue: ${self:custom.mainStackName}-ActivitiesTableArn
+            - Fn::ImportValue: ${self:custom.mainStackName}-ActivityContentTableArn
+            - Fn::ImportValue: ${self:custom.mainStackName}-SpamActivitiesTableArn
+            - Fn::Sub:
+              - "${LeadsTableArn}/index/*"
+              - LeadsTableArn:
+                  Fn::ImportValue: ${self:custom.mainStackName}-LeadsTableArn
+            - Fn::Sub:
+              - "${ContactMethodsTableArn}/index/*"
+              - ContactMethodsTableArn:
+                  Fn::ImportValue: ${self:custom.mainStackName}-ContactMethodsTableArn
+            - Fn::Sub:
+              - "${ActivitiesTableArn}/index/*"
+              - ActivitiesTableArn:
+                  Fn::ImportValue: ${self:custom.mainStackName}-ActivitiesTableArn
+            - Fn::Sub:
+              - "${SpamActivitiesTableArn}/index/*"
+              - SpamActivitiesTableArn:
+                  Fn::ImportValue: ${self:custom.mainStackName}-SpamActivitiesTableArn
+
+functions:
+  # Lead Management
+  createLead:
+    handler: handlers/create_lead.lambda_handler
+    events:
+      - http:
+          path: api/leads
+          method: post
+          cors: true
+          private: true  # Requires API key
+  
+  listLeads:
+    handler: handlers/list_leads.lambda_handler
+    events:
+      - http:
+          path: api/leads
+          method: get
+          cors: true
+          private: true  # Requires API key
+  
+  getLeadDetails:
+    handler: handlers/get_lead_details.lambda_handler
+    events:
+      - http:
+          path: api/lead/{lead_id}
+          method: get
+          cors: true
+          private: true  # Requires API key
+  
+  # Analytics
+  getDailyAnalytics:
+    handler: handlers/get_daily_analytics.lambda_handler
+    events:
+      - http:
+          path: api/analytics/daily
+          method: get
+          cors: true
+          private: true  # Requires API key
+  
+  getSpamActivities:
+    handler: handlers/get_spam_activities.lambda_handler
+    events:
+      - http:
+          path: api/spam/activities
+          method: get
+          cors: true
+          private: true  # Requires API key
+  
+  getSpamUsers:
+    handler: handlers/get_spam_users.lambda_handler
+    events:
+      - http:
+          path: api/spam/users
+          method: get
+          cors: true
+          private: true  # Requires API key
+
+  removeSpamActivities:
+    handler: handlers/remove_spam_activities.lambda_handler
+    events:
+      - http:
+          path: api/spam/activities/{lead_id}
+          method: delete
+          cors: true
+          private: true  # Requires API key
+
 custom:
   mainStackName: pandasdb-crm-comm-${self:provider.stage}
+  pythonRequirements:
+    dockerizePip: true
+    slim: true
+    strip: false
 
 resources:
   Resources:
+    # API Key for Backoffice Access
+    BackofficeApiKey:
+      Type: AWS::ApiGateway::ApiKey
+      Properties:
+        Name: ${self:service}-${self:provider.stage}-api-key
+        Description: Auto-generated API Key for Backoffice Access
+        Enabled: true
+        Value: !Sub '${AWS::StackName}-${AWS::AccountId}-${AWS::Region}-${self:provider.stage}'
+
+    # Usage Plan for Rate Limiting and API Key Management
+    BackofficeUsagePlan:
+      Type: AWS::ApiGateway::UsagePlan
+      Properties:
+        UsagePlanName: ${self:service}-${self:provider.stage}-usage-plan
+        Description: Usage plan for Backoffice API with rate limiting
+        ApiStages:
+          - ApiId: !Ref ApiGatewayRestApi
+            Stage: ${self:provider.stage}
+        Throttle:
+          RateLimit: 100      # 100 requests per second
+          BurstLimit: 200     # 200 concurrent requests max
+        Quota:
+          Limit: 10000        # 10000 requests per day
+          Period: DAY
+
+    # Link API Key to Usage Plan
+    BackofficeUsagePlanKey:
+      Type: AWS::ApiGateway::UsagePlanKey
+      DependsOn:
+        - BackofficeApiKey
+        - BackofficeUsagePlan
+      Properties:
+        KeyId: !Ref BackofficeApiKey
+        KeyType: API_KEY
+        UsagePlanId: !Ref BackofficeUsagePlan
+
     # S3 Bucket for Backoffice Frontend
     BackofficeBucket:
       Type: AWS::S3::Bucket
@@ -111,9 +275,23 @@ resources:
       Export:
         Name: ${self:service}-${self:provider.stage}-BackofficeDistributionId
     
-    MainApiUrl:
-      Description: "Main API URL for backoffice to connect to"
-      Value: 
-        Fn::ImportValue: ${self:custom.mainStackName}-BackofficeApiUrl
+    BackofficeApiUrl:
+      Description: "Backoffice API URL"
+      Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}"
       Export:
-        Name: ${self:service}-${self:provider.stage}-MainApiUrl
+        Name: ${self:service}-${self:provider.stage}-BackofficeApiUrl
+
+    BackofficeApiKey:
+      Description: "Auto-generated API Key for Backoffice Access"
+      Value: !Ref BackofficeApiKey
+      Export:
+        Name: ${self:service}-${self:provider.stage}-BackofficeApiKey
+
+    BackofficeApiKeyValue:
+      Description: "API Key Value for Frontend Configuration"
+      Value: !Sub '${AWS::StackName}-${AWS::AccountId}-${AWS::Region}-${self:provider.stage}'
+      Export:
+        Name: ${self:service}-${self:provider.stage}-BackofficeApiKeyValue
+
+plugins:
+  - serverless-python-requirements

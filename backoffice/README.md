@@ -11,7 +11,8 @@ Modern web-based backoffice interface for monitoring and managing the PandasDB C
 - System health monitoring
 
 ### **👥 Lead Management**
-- Lead lookup by ID
+- Create new leads with contact methods
+- Lead lookup and listing with pagination
 - Complete conversation history
 - Contact method tracking
 - Activity timeline view
@@ -21,11 +22,6 @@ Modern web-based backoffice interface for monitoring and managing the PandasDB C
 - Spam user classification
 - Detection reason tracking
 - Blocking status overview
-
-### **⚙️ System Settings**
-- Configuration management
-- Data export capabilities
-- API endpoint monitoring
 
 ## 🏗️ Architecture
 
@@ -41,10 +37,18 @@ The backoffice has its own serverless.yml and deployment pipeline, making it com
 - **Optional Feature**: Can be skipped for minimal deployments
 - **Easy Removal**: Clean removal without affecting main system
 
+### **Handler-Based Architecture**
+Each API endpoint has its own dedicated Lambda function:
+
+- **Modular Design**: Separate handlers per endpoint
+- **Easy Maintenance**: Focused, single-purpose functions
+- **Independent Scaling**: Each function scales independently
+- **Clear Separation**: Lead management vs analytics
+
 ## 🚀 Deployment
 
 ### **Prerequisites**
-Deploy the main CRM system first:
+Deploy the main CRM system first to create the required DynamoDB tables:
 ```bash
 # From project root
 npm run deploy:dev
@@ -61,8 +65,8 @@ chmod +x scripts/deploy.sh
 ```bash
 cd backoffice
 
-# 1. Deploy infrastructure (S3 + CloudFront)
-npm run deploy-infra
+# 1. Deploy infrastructure
+npx serverless deploy --stage dev
 
 # 2. Deploy frontend files
 npm run deploy-frontend
@@ -95,17 +99,25 @@ npm run remove-infra
 
 ```
 backoffice/
+├── api/                    # Lambda function handlers
+│   ├── utils.py           # Shared utilities
+│   ├── create_leads.py    # Lead creation endpoint
+│   ├── list_leads.py      # Lead listing with pagination
+│   ├── get_lead_details.py # Lead details with activities
+│   ├── get_daily_analytics.py # Dashboard statistics
+│   ├── get_spam_activities.py # Spam monitoring
+│   ├── get_spam_users.py  # Spam user classification
+│   ├── get_spam_analytics.py # Additional spam analytics
+│   └── handlers.py        # Legacy single handler (optional)
 ├── frontend/              # Static web interface
 │   ├── index.html        # Main backoffice page
-│   ├── styles.css        # Modern styling
-│   └── script.js         # Application logic
-├── api/                  # Backend API handlers
-│   └── handlers.py       # Analytics and monitoring APIs
+│   ├── style.css         # Modern styling
+│   └── scripts.js        # Application logic
 ├── scripts/              # Deployment automation
 │   └── deploy.sh         # Automated deployment script
 ├── serverless.yml        # Infrastructure as Code
-├── package.json          # Deployment scripts
-└── README.md            # This file
+├── package.json          # Frontend deployment scripts
+└── README.md             # This file
 ```
 
 ## 🔧 Configuration
@@ -113,29 +125,56 @@ backoffice/
 ### **Automatic Configuration**
 The deployment script automatically:
 - Detects main API Gateway URL
-- Updates frontend configuration
+- Retrieves auto-generated API key
+- Updates frontend configuration in `scripts.js`
 - Deploys to correct S3 bucket
 - Invalidates CloudFront cache
-- Provides access URLs
+- Provides access URLs and credentials
 
 ### **Manual Configuration**
-If needed, update the API URL in `frontend/script.js`:
+If needed, update the API URL and key in `frontend/scripts.js`:
 ```javascript
 getApiBaseUrl() {
     return 'https://your-actual-api-gateway-url.com/dev';
 }
+
+getApiKey() {
+    return 'your-auto-generated-api-key';
+}
 ```
 
-## 📊 API Integration
+## 📊 API Endpoints
 
-The backoffice connects to these main system endpoints:
+### **Lead Management**
+| Method | Endpoint | Handler | Purpose |
+|--------|----------|---------|---------|
+| `POST` | `/api/leads` | `create_leads.py` | Create lead with contact methods |
+| `GET` | `/api/leads` | `list_leads.py` | List leads with pagination |
+| `GET` | `/api/lead/{id}` | `get_lead_details.py` | Lead details with history |
 
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /api/analytics/daily` | Dashboard statistics |
-| `GET /api/lead/{id}` | Lead details with history |
-| `GET /api/spam/activities` | Recent spam activities |
-| `GET /api/spam/users` | Spam user classification |
+### **Analytics & Monitoring**
+| Method | Endpoint | Handler | Purpose |
+|--------|----------|---------|---------|
+| `GET` | `/api/analytics/daily` | `get_daily_analytics.py` | Dashboard statistics |
+| `GET` | `/api/spam/activities` | `get_spam_activities.py` | Recent spam activities |
+| `GET` | `/api/spam/users` | `get_spam_users.py` | Spam user classification |
+| `GET` | `/api/spam/analytics` | `get_spam_analytics.py` | Additional spam analytics |
+| `DELETE` | `/api/spam/activities/{lead_id}` | `remove_spam_activities.py` | Remove spam activities for lead |
+
+### **API Security**
+All endpoints require API key authentication:
+```bash
+# Remove all spam activities for a lead
+curl -X DELETE -H "x-api-key: YOUR-API-KEY" \
+  https://api-url/api/spam/activities/lead-123
+
+# Remove specific spam activity for a lead
+curl -X DELETE -H "x-api-key: YOUR-API-KEY" \
+  https://api-url/api/spam/activities/lead-123?activity_id=activity-456
+
+# Get analytics
+curl -H "x-api-key: YOUR-API-KEY" https://api-url/api/analytics/daily
+```
 
 ## 🎨 UI/UX Features
 
@@ -159,6 +198,12 @@ The backoffice connects to these main system endpoints:
 - Spam detection percentage
 - Active spam users count
 
+### **Lead Management**
+- Create new leads via API
+- Search and filter leads
+- View complete conversation history
+- Track contact methods and settings
+
 ### **Detailed Insights**
 - Individual lead conversation history
 - Spam activity timeline with reasons
@@ -172,310 +217,153 @@ The backoffice connects to these main system endpoints:
 1. **Main Stack Not Found**
    ```bash
    # Deploy main system first
-   cd .. && npm run deploy:dev
+   serverless deploy --stage dev
    ```
 
-2. **CloudFront Not Updating**
+2. **API Authentication Failed**
+   ```bash
+   # Check API key in CloudFormation outputs
+   aws cloudformation describe-stacks --stack-name pandasdb-crm-comm-backoffice-dev \
+     --query 'Stacks[0].Outputs[?OutputKey==`BackofficeApiKeyValue`].OutputValue' --output text
+   ```
+
+3. **CloudFront Not Updating**
    ```bash
    # Invalidate cache manually
    npm run invalidate
+   
+   # Or using the deploy script
+   ./scripts/deploy.sh dev
    ```
 
-3. **API Connection Issues**
+4. **API Connection Issues**
    ```bash
-   # Check if main system deployed correctly
-   aws cloudformation describe-stacks --stack-name pandasdb-crm-comm-dev
+   # Test with API key
+   curl -H "x-api-key: YOUR-API-KEY" https://your-api-url/api/analytics/daily
    ```
 
-4. **Permission Errors**
+5. **Permission Errors**
    ```bash
    # Check AWS credentials
    aws sts get-caller-identity
    ```
 
+6. **Lambda Import Errors**
+   ```bash
+   # Check handler path structure
+   ls -la api/
+   
+   # Verify utils.py exists
+   cat api/utils.py
+   ```
+
 ### **Debug Commands**
 ```bash
 # Check backoffice infrastructure
-npm run info
+npx serverless info --stage dev
 
 # View deployment logs
-npm run logs
+npx serverless logs -f createLeads --stage dev
 
-# Test API endpoints directly
-curl https://your-api-url/api/analytics/daily
+# Test API endpoints with authentication
+curl -H "x-api-key: YOUR-API-KEY" https://your-api-url/api/analytics/daily
+
+# Use automated deployment script
+./scripts/deploy.sh dev
 ```
 
 ## 🔐 Security
 
+### **API Key Authentication**
+- **Auto-generated Keys**: Deterministic API key per deployment
+- **Rate Limiting**: 100 req/sec, 200 burst, 10K daily quota
+- **Private Endpoints**: All API endpoints require valid API key
+- **Secure Headers**: API key passed via `x-api-key` header
+
 ### **Access Control**
-- **Public Frontend**: Read-only monitoring interface
-- **API Authentication**: Uses main system's API Gateway
-- **CORS Enabled**: Secure cross-origin requests
-- **HTTPS Only**: Enforced via CloudFront
+- **Secured API**: All endpoints protected with API key authentication
+- **API Gateway**: CORS enabled with rate limiting
+- **Lambda Functions**: Minimal IAM permissions
+- **DynamoDB**: Read/write access to required tables only
 
 ### **Data Protection**
-- **No Sensitive Data**: Only aggregated statistics
-- **Read-Only Access**: Cannot modify system data
+- **HTTPS Only**: Enforced via CloudFront
+- **No Sensitive Data**: Only business data
 - **Encrypted Transit**: All data encrypted in transit
+- **Resource Isolation**: Separate from main system
+
+### **Security Features**
+- **Auto-generated API Keys**: Format: `{StackName}-{AccountId}-{Region}-{Stage}`
+- **Usage Plans**: Throttling and quota management
+- **Request Validation**: Input validation at API Gateway level
+- **Error Handling**: No sensitive info in error responses
 
 ## 💰 Cost Implications
 
 ### **Additional Costs**
+- **Lambda Functions**: ~$0.01-0.10/month per function
 - **S3 Storage**: ~$0.50/month for static files
 - **CloudFront**: ~$1-5/month depending on usage
-- **Data Transfer**: Minimal for backoffice usage
+- **API Gateway**: ~$0.10/month for API calls + usage plan overhead
 
 ### **Cost Optimization**
+- **Pay-per-request**: Only pay for actual usage
 - **CDN Caching**: Reduces API calls
 - **Static Hosting**: No server costs
 - **Optional Deployment**: Only deploy if needed
 
 ## 📈 Performance
 
-### **Optimizations**
-- **Global CDN**: CloudFront edge locations
-- **Asset Compression**: Gzip enabled
-- **Efficient Caching**: Smart cache headers
-- **Lazy Loading**: Load data on demand
+### **Handler Performance**
+- **Cold Start**: < 1 second per function
+- **Warm Execution**: < 100ms
+- **Memory**: 512MB per function
+- **Timeout**: 30 seconds
 
-### **Metrics**
+### **Frontend Performance**
 - **Initial Load**: < 2 seconds
 - **API Response**: < 500ms average
 - **Interactive Time**: < 1 second
 
+### **Rate Limiting**
+- **Normal Rate**: 100 requests/second
+- **Burst Capacity**: 200 requests/second
+- **Daily Quota**: 10,000 requests/day
+- **Throttling**: Automatic with HTTP 429 responses
+
 ## 🤝 Contributing
+
+### **Adding New Endpoints**
+1. Create new handler in `api/`
+2. Add function definition to `serverless.yml` with `private: true`
+3. Update frontend to include API key in requests
+4. Test and deploy
 
 ### **Frontend Changes**
 1. Edit files in `frontend/`
-2. Test locally with `npm run dev` 
-3. Deploy with `npm run deploy`
+2. Ensure API key is included in all requests
+3. Run `./scripts/deploy.sh dev` to update S3
+4. CloudFront cache automatically invalidated
 
 ### **Infrastructure Changes**
 1. Edit `serverless.yml`
-2. Deploy with `npm run deploy-infra`
-3. Update frontend if needed
+2. Deploy with `npx serverless deploy`
+3. Update documentation
+
+### **API Key Management**
+- **Rotation**: Redeploy stack to generate new key
+- **Retrieval**: Use CloudFormation outputs to get current key
+- **Distribution**: Update frontend configuration after key changes
 
 ## 📋 Roadmap
 
-- [ ] **Authentication**: Admin login system
+- [ ] **Enhanced Authentication**: JWT-based authentication system
 - [ ] **Real-time Updates**: WebSocket integration
 - [ ] **Advanced Charts**: Data visualization
-- [ ] **Mobile App**: React Native version
-- [ ] **Alerts**: Email/SMS notifications ←→ API Gateway ←→ Lambda Functions ←→ DynamoDB
-```
-
-### **Frontend Stack**
-- **Pure JavaScript**: No frameworks, fast loading
-- **Modern CSS**: Gradients, animations, responsive design
-- **S3 Hosting**: Static website hosting
-- **CloudFront CDN**: Global content delivery
-
-### **Backend Integration**
-- **RESTful API**: Clean API endpoints
-- **CORS Enabled**: Cross-origin requests
-- **Error Handling**: Graceful error management
-- **Real-time Data**: Fresh analytics on demand
-
-## 🚀 Deployment
-
-### **Automatic Deployment**
-The backoffice is deployed automatically with the main serverless stack:
-
-```bash
-# Deploy infrastructure (includes backoffice)
-npm run deploy:dev
-
-# Deploy frontend separately
-cd backoffice
-npm run deploy
-```
-
-### **Manual Frontend Deployment**
-```bash
-cd backoffice
-
-# Deploy to development
-npm run deploy
-
-# Deploy to production  
-npm run deploy:prod
-
-# Invalidate CloudFront cache
-npm run invalidate
-```
-
-### **Local Development**
-```bash
-cd backoffice
-
-# Start local server
-npm run dev
-# Opens http://localhost:8080
-
-# Update API endpoint in script.js for local testing
-```
-
-## 📁 File Structure
-
-```
-backoffice/
-├── frontend/
-│   ├── index.html          # Main backoffice interface
-│   ├── styles.css          # Modern styling with animations
-│   └── script.js           # Application logic and API calls
-├── api/
-│   └── handlers.py         # Backend API handlers
-├── package.json            # Frontend deployment scripts
-└── README.md              # This file
-```
-
-## 🔧 Configuration
-
-### **API Integration**
-The frontend automatically detects the API endpoint based on deployment:
-- **Development**: Uses API Gateway URL
-- **Production**: Uses custom domain if configured
-
-### **Environment Setup**
-No environment variables needed for frontend - all configuration is automatic.
-
-## 📊 API Endpoints
-
-The backoffice consumes these API endpoints:
-
-| Endpoint | Purpose | Response |
-|----------|---------|----------|
-| `GET /api/analytics/daily` | Dashboard statistics | Total leads, messages, spam % |
-| `GET /api/lead/{id}` | Lead details | Lead info + conversation history |
-| `GET /api/spam/activities` | Recent spam activities | Spam messages with details |
-| `GET /api/spam/users` | Spam user list | Users classified as spammers |
-
-## 🎨 UI/UX Features
-
-### **Design Elements**
-- **Gradient Backgrounds**: Modern purple/blue gradients
-- **Glass Morphism**: Translucent cards with backdrop blur
-- **Smooth Animations**: Hover effects, loading states
-- **Responsive Design**: Works on desktop, tablet, mobile
-
-### **Interactive Features**
-- **Live Search**: Real-time lead lookup
-- **Tab Navigation**: Organized content sections  
-- **Data Refresh**: Manual refresh with loading states
-- **Notifications**: Success/error toast messages
-- **Loading States**: Skeleton screens and spinners
-
-### **Accessibility**
-- **Keyboard Navigation**: Full keyboard support
-- **Screen Reader**: Semantic HTML structure
-- **Color Contrast**: High contrast for readability
-- **Mobile Friendly**: Touch-optimized interface
-
-## 🔍 Monitoring Capabilities
-
-### **System Health**
-- API status monitoring
-- Database connectivity
-- Lambda function health
-- Bedrock AI status
-
-### **Performance Metrics**
-- Message processing volume
-- Response time tracking
-- Error rate monitoring
-- Spam detection accuracy
-
-### **User Analytics**
-- Lead conversion tracking
-- Conversation patterns
-- Spam user behavior
-- Activity trends
-
-## 🚨 Troubleshooting
-
-### **Common Issues**
-
-1. **API Connection Failed**
-   ```bash
-   # Check API Gateway deployment
-   aws apigateway get-rest-apis
-   
-   # Verify Lambda functions
-   aws lambda list-functions --query 'Functions[?contains(FunctionName, `backoffice`)]'
-   ```
-
-2. **CloudFront Not Updating**
-   ```bash
-   # Invalidate cache
-   npm run invalidate
-   
-   # Or manually
-   aws cloudfront create-invalidation --distribution-id YOUR_ID --paths "/*"
-   ```
-
-3. **CORS Errors**
-   - Check API Gateway CORS configuration
-   - Verify Lambda response headers
-   - Test with curl/Postman first
-
-### **Debug Mode**
-Enable debug logging in script.js:
-```javascript
-// Add to script.js
-const DEBUG = true;
-console.log('API Request:', url, options);
-```
-
-## 🔐 Security
-
-### **Access Control**
-- **Public Frontend**: No authentication required
-- **API Gateway**: Rate limiting enabled  
-- **Lambda Functions**: IAM role permissions
-- **DynamoDB**: Resource-based policies
-
-### **Data Protection**
-- **HTTPS Only**: Enforced via CloudFront
-- **CORS Policy**: Restricted origins
-- **No Secrets**: No API keys in frontend
-- **Read-Only**: Monitoring interface only
-
-## 📈 Performance
-
-### **Optimization Features**
-- **CDN Delivery**: Global CloudFront distribution
-- **Gzip Compression**: Automatic asset compression
-- **Image Optimization**: Optimized icons and graphics
-- **Caching Strategy**: Appropriate cache headers
-
-### **Load Times**
-- **Initial Load**: < 2 seconds
-- **API Calls**: < 500ms average
-- **Interactive**: < 1 second to interaction
-
-## 🤝 Contributing
-
-### **Frontend Development**
-1. Edit files in `backoffice/frontend/`
-2. Test locally with `npm run dev`
-3. Deploy with `npm run deploy`
-
-### **API Development**
-1. Edit `backoffice/api/handlers.py`
-2. Deploy with main serverless stack
-3. Test API endpoints directly
-
-### **Adding Features**
-1. Add new API endpoints in handlers.py
-2. Update frontend JavaScript in script.js
-3. Style new components in styles.css
-4. Update this README
-
-## 📋 Roadmap
-
-- [ ] **User Authentication**: Login system for admin access
-- [ ] **Real-time Updates**: WebSocket for live data
-- [ ] **Advanced Analytics**: Charts and graphs
-- [ ] **Export Features**: CSV/PDF export functionality
-- [ ] **Alert System**: Email/SMS notifications
-- [ ] **Multi-language**: i18n support
+- [ ] **Bulk Operations**: Batch lead import/export
+- [ ] **Activity Management**: Create/edit activities
+- [ ] **Contact Method Settings**: Manage preferences
+- [ ] **Spam Management**: Block/unblock users
+- [ ] **Audit Logs**: Track all changes
+- [ ] **API Key Rotation**: Automated key rotation
+- [ ] **User Management**: Multiple API keys for different users
