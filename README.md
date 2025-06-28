@@ -93,8 +93,9 @@ cp .env.example .env
 # 3. Deploy to AWS
 npm run deploy:dev
 
-# 4. Upload AI knowledge base (automatically included in deploy:dev)
+# 4. Upload AI knowledge base (knowledge/system_prompt.txt) or the business config (config/business.yml). Both automatically included in deploy:dev
 # npm run upload-knowledge
+# npm run upload-config
 
 # 5. Configure platform webhooks (use URLs from deployment output)
 # WhatsApp: https://your-api-id.execute-api.region.amazonaws.com/dev/whatsapp

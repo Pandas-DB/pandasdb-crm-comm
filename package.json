@@ -9,7 +9,6 @@
     "remove": "serverless remove",
     "logs": "serverless logs -f",
     "invoke": "serverless invoke -f",
-    "setup-db": "psql -f database/supabase_schema.sql",
     "upload-knowledge": "aws s3 cp knowledge/ s3://$(aws cloudformation describe-stacks --stack-name pandasdb-crm-comm-dev --query 'Stacks[0].Outputs[?OutputKey==`KnowledgeBaseBucket`].OutputValue' --output text)/knowledge/ --recursive",
     "upload-config": "aws s3 cp config/business.yml s3://$(aws cloudformation describe-stacks --stack-name pandasdb-crm-comm-dev --query 'Stacks[0].Outputs[?OutputKey==`KnowledgeBaseBucket`].OutputValue' --output text)/config/business.yml"
   },
