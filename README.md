@@ -403,7 +403,6 @@ pandasdb-crm-comm/
 │   └── handlers/                     # Lambda function source code
 │       ├── api/                      # API endpoints
 │       │   ├── chat_api.py           # Chat API with authentication
-│       │   └── leads_api.py          # Lead management API
 │       ├── common/                   # Shared processing functions
 │       │   ├── check_content.py
 │       │   ├── get_or_create_lead.py
