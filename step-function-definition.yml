@@ -76,7 +76,7 @@ States:
         BackoffRate: 2.0
     Catch:
       - ErrorEquals: ["States.ALL"]
-        Next: GenerateAiResponse
+        Next: CreateActivity
         Comment: "If spam detection fails, treat as normal message"
   
   IsSpamMessage:
@@ -85,12 +85,12 @@ States:
       - Variable: "$.is_spam"
         BooleanEquals: true
         Next: GenerateSpamResponse
-    Default: GenerateAiResponse
+    Default: CreateActivity
   
-  GenerateSpamResponse:
+  CreateActivity:
     Type: Task
-    Resource: !GetAtt GenerateSpamResponseLambdaFunction.Arn
-    Next: SendSpamResponse
+    Resource: !GetAtt CreateActivityLambdaFunction.Arn
+    Next: GenerateResponse
     Retry:
       - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
         IntervalSeconds: 2
@@ -101,10 +101,24 @@ States:
         Next: ProcessingFailed
         ResultPath: "$.error"
   
-  GenerateAiResponse:
+  GenerateResponse:
     Type: Task
-    Resource: !GetAtt GenerateAiResponseLambdaFunction.Arn
+    Resource: !GetAtt GenerateResponseLambdaFunction.Arn
     Next: SendNormalResponse
+    Retry:
+      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+        IntervalSeconds: 2
+        MaxAttempts: 3
+        BackoffRate: 2.0
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: ProcessingFailed
+        ResultPath: "$.error"
+  
+  GenerateSpamResponse:
+    Type: Task
+    Resource: !GetAtt GenerateSpamResponseLambdaFunction.Arn
+    Next: SendSpamResponse
     Retry:
       - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
         IntervalSeconds: 2

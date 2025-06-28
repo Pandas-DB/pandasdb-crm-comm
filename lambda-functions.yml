@@ -18,15 +18,20 @@ detectSpam:
   name: ${self:service}-${self:provider.stage}-detect-spam
   description: AI-powered spam detection using Bedrock
   
+createActivity:
+  handler: src/handlers/common/create_activity.lambda_handler
+  name: ${self:service}-${self:provider.stage}-create-activity
+  description: Store inbound activity and activity content
+  
+generateResponse:
+  handler: src/handlers/common/generate_response.lambda_handler
+  name: ${self:service}-${self:provider.stage}-generate-response
+  description: Generate AI responses for normal messages
+  
 generateSpamResponse:
   handler: src/handlers/common/generate_spam_response.lambda_handler
   name: ${self:service}-${self:provider.stage}-generate-spam-response
   description: Generate spam warning/blocking responses
-  
-generateAiResponse:
-  handler: src/handlers/common/generate_ai_response.lambda_handler
-  name: ${self:service}-${self:provider.stage}-generate-ai-response
-  description: Generate AI responses for normal messages
 
 sendMessage:
   handler: src/handlers/common/send_message.lambda_handler

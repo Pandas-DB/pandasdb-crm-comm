@@ -287,8 +287,9 @@ resources:
                     - !GetAtt GetOrCreateLeadLambdaFunction.Arn
                     - !GetAtt CheckLeadSpammerLambdaFunction.Arn
                     - !GetAtt DetectSpamLambdaFunction.Arn
+                    - !GetAtt CreateActivityLambdaFunction.Arn
+                    - !GetAtt GenerateResponseLambdaFunction.Arn
                     - !GetAtt GenerateSpamResponseLambdaFunction.Arn
-                    - !GetAtt GenerateAiResponseLambdaFunction.Arn
                     - !GetAtt SendMessageLambdaFunction.Arn
 
     # Step Functions State Machine

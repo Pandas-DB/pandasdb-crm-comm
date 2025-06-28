@@ -3,7 +3,6 @@ import json
 import logging
 import boto3
 import os
-from datetime import datetime
 import uuid
 import sys
 import re
@@ -18,7 +17,7 @@ logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     """
-    Lambda function to handle normal (non-spam) messages.
+    Lambda function to generate AI response for normal (non-spam) messages.
     Uses Bedrock AI agent with knowledge base and conversation history.
     """
     
@@ -30,56 +29,15 @@ def lambda_handler(event, context):
             
         lead_id = event.get('lead_id')
         contact_method_id = event.get('contact_method_id')
+        activity_id = event.get('activity_id')
         platform = flow_input['platform']
         
         clean_phone_number = flow_input.get('From', '')
         message_body = flow_input.get('Body', '')
-        message_sid = flow_input.get('MessageSid', '')
         profile_name = flow_input.get('ProfileName', '')
         original_to = flow_input.get('To', '')
         
-        logger.info(f"Processing normal message for lead {lead_id}: {message_body[:100]}")
-        
-        # DynamoDB client
-        dynamodb = boto3.resource('dynamodb')
-        activities_table = dynamodb.Table(os.environ['ACTIVITIES_TABLE'])
-        activity_content_table = dynamodb.Table(os.environ['ACTIVITY_CONTENT_TABLE'])
-        
-        timestamp = datetime.now().isoformat()
-        
-        # Create inbound activity record BEFORE using Bedrock
-        activity_id = str(uuid.uuid4())
-        activities_table.put_item(
-            Item={
-                'id': activity_id,
-                'lead_id': lead_id,
-                'contact_method_id': contact_method_id,
-                'activity_type': platform,
-                'status': 'completed',
-                'direction': 'inbound',
-                'completed_at': timestamp,
-                'created_at': timestamp,
-                'metadata': {
-                    'messageSid': message_sid,
-                    'profileName': profile_name,
-                    'messageType': 'text',
-                    'platform': platform
-                }
-            }
-        )
-        
-        # Store inbound activity content BEFORE using Bedrock
-        activity_content_table.put_item(
-            Item={
-                'id': str(uuid.uuid4()),
-                'activity_id': activity_id,
-                'content_type': platform,
-                'content': {
-                    'leadMessage': message_body
-                },
-                'created_at': timestamp
-            }
-        )
+        logger.info(f"Generating response for lead {lead_id}: {message_body[:100]}")
         
         # Get conversation history
         conversation_history = get_conversation_history(lead_id, platform)
@@ -162,12 +120,12 @@ def lambda_handler(event, context):
             }
         }
         
-        logger.info(f"Normal message processed successfully for lead {lead_id}")
+        logger.info(f"Response generated successfully for lead {lead_id}")
         
         return response_data
         
     except Exception as e:
-        logger.error(f"Error processing normal message: {str(e)}")
+        logger.error(f"Error generating response: {str(e)}")
         return {
             'action': 'error',
             'error': str(e)
