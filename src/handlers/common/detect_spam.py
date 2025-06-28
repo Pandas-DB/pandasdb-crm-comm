@@ -1,3 +1,4 @@
+import yaml
 import json
 import logging
 import boto3
@@ -106,8 +107,15 @@ def lambda_handler(event, context):
         except:
             # Fallback parsing if JSON is malformed
             is_spam = 'true' in ai_response.lower() and 'spam' in ai_response.lower()
-            confidence = 0.7
+            confidence = config['spam_detection']['fallback_confidence']
             reason = 'AI analysis with fallback parsing'
+        
+        # Check confidence threshold
+        ai_confidence_threshold = config['spam_detection']['ai_confidence_threshold']
+        if is_spam and confidence < ai_confidence_threshold:
+            logger.info(f"Spam confidence {confidence} below threshold {ai_confidence_threshold}, treating as non-spam")
+            is_spam = False
+            reason = f"Low confidence: {reason}"
         
         logger.info(f"Spam detection result: {is_spam}, confidence: {confidence}")
         

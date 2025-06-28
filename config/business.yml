@@ -34,10 +34,15 @@ ai_models:
 
 # Character limits for responses
 reply_length:
+  default:
+    max_response_characters: 199
+    character_limit_fallback: 280
+    character_limit_truncate: 277  
+    # Number of previous messages to include in conversation context
+    conversation_history_limit: 10
   whatsapp:
     max_response_characters: 199
     character_limit_fallback: 280
     character_limit_truncate: 277
-  
     # Number of previous messages to include in conversation context
     conversation_history_limit: 10

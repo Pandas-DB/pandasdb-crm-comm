@@ -1,3 +1,4 @@
+import yaml
 import json
 import logging
 import boto3
@@ -25,11 +26,11 @@ def lambda_handler(event, context):
         # Parse input from previous lambda
         flow_input = event.get('flow_input', {})
         if isinstance(flow_input, str):
-            flow_input = json.loads(flow_input)
+            flow_input = yaml.safe_load(flow_input)
             
         lead_id = event.get('lead_id')
         contact_method_id = event.get('contact_method_id')
-        platform = flow_input.get('platform')
+        platform = flow_input['platform']
         
         clean_phone_number = flow_input.get('From', '')
         message_body = flow_input.get('Body', '')
@@ -81,7 +82,7 @@ def lambda_handler(event, context):
         )
         
         # Get conversation history
-        conversation_history = get_conversation_history(lead_id)
+        conversation_history = get_conversation_history(lead_id, platform)
         
         # Prepare conversation context for AI
         conversation_context = f"""
@@ -104,18 +105,21 @@ def lambda_handler(event, context):
         system_prompt = load_system_prompt_from_s3()
         config = load_business_config()
         
+        # Get platform-specific config or default
+        platform_config = config['reply_length'].get(platform, config['reply_length']['default'])
+        
         if not system_prompt:
             raise Exception("System prompt not found in S3")
         system_prompt = f'''{system_prompt} 
           ## CRITICAL RESPONSE RULES
-          - MAXIMUM {config['message_limits']['max_response_characters']} characters per response - this is MANDATORY
+          - MAXIMUM {platform_config['max_response_characters']} characters per response - this is MANDATORY
           - Use short sentences and abbreviations when needed
         '''
         
         # Prepare the request for Bedrock
         body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 300,
+            "anthropic_version": config['ai_models']['bedrock_version'],
+            "max_tokens": config['ai_models']['max_tokens_conversation'],
             "system": system_prompt,
             "messages": [
                 {
@@ -128,7 +132,7 @@ def lambda_handler(event, context):
         # Call Bedrock AI
         response = bedrock_runtime.invoke_model(
             body=json.dumps(body),
-            modelId='anthropic.claude-3-haiku-20240307-v1:0',
+            modelId=config['ai_models']['bedrock_model_id'],
             accept='application/json',
             contentType='application/json'
         )
@@ -138,7 +142,7 @@ def lambda_handler(event, context):
         ai_response = response_body.get('content', [{}])[0].get('text', '')
         
         # Split message if it's too long (> N characters)
-        max_length = config['message_limits']['character_limit_fallback']
+        max_length = platform_config['character_limit_fallback']
         ai_responses = split_message_by_stops(ai_response, max_length)
         
         logger.info(f"AI generated response: {ai_response}")
@@ -218,7 +222,7 @@ def split_message_by_stops(message, max_length):
     
     return messages
 
-def get_conversation_history(lead_id):
+def get_conversation_history(lead_id, platform):
     """Get conversation history for the lead"""
     try:
         config = load_business_config()
@@ -226,13 +230,16 @@ def get_conversation_history(lead_id):
         activities_table = dynamodb.Table(os.environ['ACTIVITIES_TABLE'])
         activity_content_table = dynamodb.Table(os.environ['ACTIVITY_CONTENT_TABLE'])
         
+        # Get platform-specific config or default
+        platform_config = config['reply_length'].get(platform, config['reply_length']['default'])
+        
         # Get recent activities for this lead
         response = activities_table.query(
             IndexName='lead-id-created-at-index',
             KeyConditionExpression='lead_id = :lead_id',
             ExpressionAttributeValues={':lead_id': lead_id},
             ScanIndexForward=False,  # Most recent first
-            Limit=config['message_limits']['conversation_history_limit']
+            Limit=platform_config['conversation_history_limit']
         )
         
         conversation_history = []
