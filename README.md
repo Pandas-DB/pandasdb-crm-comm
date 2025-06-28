@@ -228,7 +228,7 @@ spam_detection:
 Your webhook endpoints have built-in protection against abuse and excessive requests:
 
 ```yaml
-# Current limits in lambda-functions.yml
+# Current limits in infra/lambda-functions.yml
 whatsappWebhook:
   reservedConcurrency: 10    # Max 10 concurrent Lambda executions
   events:
@@ -260,7 +260,7 @@ With these limits, the **maximum daily cost** from malicious attacks is capped a
 
 ### **Customizing Rate Limits**
 
-Modify `lambda-functions.yml` to adjust protection levels:
+Modify `infra/lambda-functions.yml` to adjust protection levels:
 
 ```yaml
 whatsappWebhook:
@@ -299,7 +299,7 @@ whatsappWebhook:
 ### **Adding a New Lambda Function**
 
 1. **Create the handler**: Add new Python file in appropriate `src/handlers/` subdirectory
-2. **Update lambda-functions.yml**: Add function definition
+2. **Update infra/lambda-functions.yml**: Add function definition
    ```yaml
    newFunction:
      handler: src/handlers/common/new_function.lambda_handler
@@ -307,25 +307,25 @@ whatsappWebhook:
      description: Description of new function
    ```
 3. **Update IAM permissions** (if needed): Add resources to `serverless.yml`
-4. **Update Step Function workflow** (if needed): Modify `step-function-definition.yml`
+4. **Update Step Function workflow** (if needed): Modify `infra/step-function-definition.yml`
 
 ### **Adding a New Platform**
 
 1. **Create webhook handler**: Add new file in `src/handlers/phone/`
-2. **Update lambda-functions.yml**: Add webhook endpoint
+2. **Update infra/lambda-functions.yml**: Add webhook endpoint
 3. **Import shared utilities**: Use `from handlers_aux import ...` for common functions
 4. **Test with new webhook URL**: `https://your-api.com/newplatform`
 
 ### **Removing a Lambda Function**
 
-1. **Remove from lambda-functions.yml**: Delete the function definition
-2. **Update Step Function workflow**: Remove references in `step-function-definition.yml`
+1. **Remove from infra/lambda-functions.yml**: Delete the function definition
+2. **Update Step Function workflow**: Remove references in `infra/step-function-definition.yml`
 3. **Remove handler file**: Delete from `src/handlers/`
 4. **Clean up IAM permissions**: Remove unused resources from `serverless.yml`
 
 ### **Modifying the Step Function Workflow**
 
-Edit `step-function-definition.yml` to:
+Edit `infra/step-function-definition.yml` to:
 - **Add new states**: Insert new Task, Choice, or other state types
 - **Change flow logic**: Modify Choice conditions or state transitions
 - **Update error handling**: Add/modify Retry and Catch blocks
@@ -333,7 +333,7 @@ Edit `step-function-definition.yml` to:
 
 **Example - Adding a new step:**
 ```yaml
-# In step-function-definition.yml
+# In infra/step-function-definition.yml
 NewProcessingStep:
   Type: Task
   Resource: !GetAtt NewFunctionLambdaFunction.Arn
@@ -357,13 +357,15 @@ NewProcessingStep:
 ```
 pandasdb-crm-comm/
 ├── serverless.yml                    # Main configuration (infrastructure, IAM, resources)
-├── lambda-functions.yml              # Lambda function definitions
-├── step-function-definition.yml      # Step Functions workflow
 ├── package.json                      # Node.js dependencies and scripts
 ├── requirements.txt                  # Python dependencies
 ├── .env.example                      # Environment variables template
 ├── config/
 │   └── business.yml                  # Business logic configuration (spam rules, AI settings)
+├── infra/
+│   ├── lambda-functions.yml          # Lambda function definitions
+│   ├── step-function-definition.yml  # Step Functions workflow
+│   └── dynamodb_schema.yml           # Database schema documentation
 ├── src/
 │   ├── aux.py                        # General utilities
 │   ├── handlers_aux.py               # Shared webhook utilities and common functions
@@ -831,6 +833,17 @@ npm run remove-infra
 1. **Messages Not Processing**
    ```bash
    # Check Step Functions executions
+   aws stepfunctions list-executions --state-machine-arn <arn>
+   
+   # View Lambda logs
+   aws logs filter-log-events --log-group-name /aws/lambda/function-name
+   ```
+
+2. **High Costs**
+   ```bash
+   # Monitor Bedrock usage
+   aws bedrock get-model-invocation-job --job-identifier <id>
+   
    # Check DynamoDB consumption
    aws dynamodb describe-table --table-name <table-name>
    ```
@@ -940,16 +953,4 @@ We're here to help you succeed:
 
 [⭐ Star on GitHub](https://github.com/your-repo) • [📚 Documentation](./docs/) • [🐛 Report Bug](https://github.com/your-repo/issues) • [💡 Request Feature](https://github.com/your-repo/issues/new?template=feature_request.md)
 
-</div> stepfunctions list-executions --state-machine-arn <arn>
-   
-   # View Lambda logs
-   aws logs filter-log-events --log-group-name /aws/lambda/function-name
-   ```
-
-2. **High Costs**
-   ```bash
-   # Monitor Bedrock usage
-   aws bedrock get-model-invocation-job --job-identifier <id>
-   
-   # Check DynamoDB consumption
-   aws
+</div>
