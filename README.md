@@ -388,8 +388,6 @@ pandasdb-crm-comm/
 │           └── telegram_webhook.py   # Telegram Bot API
 ├── knowledge/
 │   └── system_prompt.txt             # AI knowledge base
-├── database/
-│   └── dynamodb_schema.yml           # Database schema documentation
 └── backoffice/                       # Optional monitoring interface
     ├── serverless.yml
     ├── frontend/
