@@ -1,141 +1,155 @@
 Comment: "Multi-Platform Lead Bot Processing Pipeline"
 StartAt: CheckMessageContent
 States:
- CheckMessageContent:
-   Type: Task
-   Resource: !GetAtt CheckContentLambdaFunction.Arn
-   Next: HasContent
-   Retry:
-     - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
-       IntervalSeconds: 2
-       MaxAttempts: 3
-       BackoffRate: 2.0
-   Catch:
-     - ErrorEquals: ["States.ALL"]
-       Next: ProcessingFailed
-       ResultPath: "$.error"
- 
- HasContent:
-   Type: Choice
-   Choices:
-     - Variable: "$.action"
-       StringEquals: "stop"
-       Next: MessageEmpty
-     - Variable: "$.action"
-       StringEquals: "continue"
-       Next: CheckPhoneAndSpammer
-   Default: ProcessingFailed
- 
- MessageEmpty:
-   Type: Succeed
- 
- CheckPhoneAndSpammer:
-   Type: Task
-   Resource: !GetAtt CheckPhoneSpammerLambdaFunction.Arn
-   Next: CheckIfExistingSpammer
-   Retry:
-     - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
-       IntervalSeconds: 2
-       MaxAttempts: 3
-       BackoffRate: 2.0
-   Catch:
-     - ErrorEquals: ["States.ALL"]
-       Next: ProcessingFailed
-       ResultPath: "$.error"
- 
- CheckIfExistingSpammer:
-   Type: Choice
-   Choices:
-     - Variable: "$.is_spammer"
-       BooleanEquals: true
-       Next: GenerateSpamResponse
-   Default: DetectSpam
- 
- DetectSpam:
-   Type: Task
-   Resource: !GetAtt DetectSpamLambdaFunction.Arn
-   Next: IsSpamMessage
-   Retry:
-     - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
-       IntervalSeconds: 2
-       MaxAttempts: 3
-       BackoffRate: 2.0
-   Catch:
-     - ErrorEquals: ["States.ALL"]
-       Next: GenerateAiResponse
-       Comment: "If spam detection fails, treat as normal message"
- 
- IsSpamMessage:
-   Type: Choice
-   Choices:
-     - Variable: "$.is_spam"
-       BooleanEquals: true
-       Next: GenerateSpamResponse
-   Default: GenerateAiResponse
- 
- GenerateSpamResponse:
-   Type: Task
-   Resource: !GetAtt GenerateSpamResponseLambdaFunction.Arn
-   Next: SendSpamResponse
-   Retry:
-     - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
-       IntervalSeconds: 2
-       MaxAttempts: 3
-       BackoffRate: 2.0
-   Catch:
-     - ErrorEquals: ["States.ALL"]
-       Next: ProcessingFailed
-       ResultPath: "$.error"
- 
- GenerateAiResponse:
-   Type: Task
-   Resource: !GetAtt GenerateAiResponseLambdaFunction.Arn
-   Next: SendNormalResponse
-   Retry:
-     - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
-       IntervalSeconds: 2
-       MaxAttempts: 3
-       BackoffRate: 2.0
-   Catch:
-     - ErrorEquals: ["States.ALL"]
-       Next: ProcessingFailed
-       ResultPath: "$.error"
- 
- SendSpamResponse:
-   Type: Task
-   Resource: !GetAtt SendMessageLambdaFunction.Arn
-   Next: SpamProcessed
-   Retry:
-     - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
-       IntervalSeconds: 2
-       MaxAttempts: 3
-       BackoffRate: 2.0
-   Catch:
-     - ErrorEquals: ["States.ALL"]
-       Next: SpamProcessed
-       Comment: "Continue even if message sending fails"
- 
- SendNormalResponse:
-   Type: Task
-   Resource: !GetAtt SendMessageLambdaFunction.Arn
-   Next: MessageProcessed
-   Retry:
-     - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
-       IntervalSeconds: 2
-       MaxAttempts: 3
-       BackoffRate: 2.0
-   Catch:
-     - ErrorEquals: ["States.ALL"]
-       Next: MessageProcessed
-       Comment: "Continue even if message sending fails"
- 
- SpamProcessed:
-   Type: Succeed
- 
- MessageProcessed:
-   Type: Succeed
- 
- ProcessingFailed:
-   Type: Fail
-   Cause: "Message processing failed"
-   Error: "ProcessingError"
+  CheckMessageContent:
+    Type: Task
+    Resource: !GetAtt CheckContentLambdaFunction.Arn
+    Next: HasContent
+    Retry:
+      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+        IntervalSeconds: 2
+        MaxAttempts: 3
+        BackoffRate: 2.0
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: ProcessingFailed
+        ResultPath: "$.error"
+  
+  HasContent:
+    Type: Choice
+    Choices:
+      - Variable: "$.action"
+        StringEquals: "stop"
+        Next: MessageEmpty
+      - Variable: "$.action"
+        StringEquals: "continue"
+        Next: GetOrCreateLead
+    Default: ProcessingFailed
+  
+  MessageEmpty:
+    Type: Succeed
+  
+  GetOrCreateLead:
+    Type: Task
+    Resource: !GetAtt GetOrCreateLeadLambdaFunction.Arn
+    Next: CheckLeadSpammer
+    Retry:
+      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+        IntervalSeconds: 2
+        MaxAttempts: 3
+        BackoffRate: 2.0
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: ProcessingFailed
+        ResultPath: "$.error"
+  
+  CheckLeadSpammer:
+    Type: Task
+    Resource: !GetAtt CheckLeadSpammerLambdaFunction.Arn
+    Next: CheckIfExistingSpammer
+    Retry:
+      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+        IntervalSeconds: 2
+        MaxAttempts: 3
+        BackoffRate: 2.0
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: ProcessingFailed
+        ResultPath: "$.error"
+  
+  CheckIfExistingSpammer:
+    Type: Choice
+    Choices:
+      - Variable: "$.is_spammer"
+        BooleanEquals: true
+        Next: GenerateSpamResponse
+    Default: DetectSpam
+  
+  DetectSpam:
+    Type: Task
+    Resource: !GetAtt DetectSpamLambdaFunction.Arn
+    Next: IsSpamMessage
+    Retry:
+      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+        IntervalSeconds: 2
+        MaxAttempts: 3
+        BackoffRate: 2.0
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: GenerateAiResponse
+        Comment: "If spam detection fails, treat as normal message"
+  
+  IsSpamMessage:
+    Type: Choice
+    Choices:
+      - Variable: "$.is_spam"
+        BooleanEquals: true
+        Next: GenerateSpamResponse
+    Default: GenerateAiResponse
+  
+  GenerateSpamResponse:
+    Type: Task
+    Resource: !GetAtt GenerateSpamResponseLambdaFunction.Arn
+    Next: SendSpamResponse
+    Retry:
+      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+        IntervalSeconds: 2
+        MaxAttempts: 3
+        BackoffRate: 2.0
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: ProcessingFailed
+        ResultPath: "$.error"
+  
+  GenerateAiResponse:
+    Type: Task
+    Resource: !GetAtt GenerateAiResponseLambdaFunction.Arn
+    Next: SendNormalResponse
+    Retry:
+      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+        IntervalSeconds: 2
+        MaxAttempts: 3
+        BackoffRate: 2.0
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: ProcessingFailed
+        ResultPath: "$.error"
+  
+  SendSpamResponse:
+    Type: Task
+    Resource: !GetAtt SendMessageLambdaFunction.Arn
+    Next: SpamProcessed
+    Retry:
+      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+        IntervalSeconds: 2
+        MaxAttempts: 3
+        BackoffRate: 2.0
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: SpamProcessed
+        Comment: "Continue even if message sending fails"
+  
+  SendNormalResponse:
+    Type: Task
+    Resource: !GetAtt SendMessageLambdaFunction.Arn
+    Next: MessageProcessed
+    Retry:
+      - ErrorEquals: ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"]
+        IntervalSeconds: 2
+        MaxAttempts: 3
+        BackoffRate: 2.0
+    Catch:
+      - ErrorEquals: ["States.ALL"]
+        Next: MessageProcessed
+        Comment: "Continue even if message sending fails"
+  
+  SpamProcessed:
+    Type: Succeed
+  
+  MessageProcessed:
+    Type: Succeed
+  
+  ProcessingFailed:
+    Type: Fail
+    Cause: "Message processing failed"
+    Error: "ProcessingError"

@@ -1,0 +1,43 @@
+spam_detection:
+  # List of [days, max_spam_activities] tuples - user marked as spammer if exceeds limit
+  spam_activities_limits: 
+    - [30, 5]  # 5 spam activities in 30 days
+  
+  # List of [days, max_messages] tuples - user marked as spammer if exceeds limit
+  message_limits:
+    - [1, 50]    # 50 messages in 1 day
+    - [7, 200]   # 200 messages in 7 days
+    - [30, 600]  # 600 messages in 30 days
+  
+  # Warning threshold offset - warn user when they reach (limit - offset) messages
+  warning_threshold_offset: 5
+  
+  # AI confidence thresholds for spam detection
+  ai_confidence_threshold: 0.7
+  fallback_confidence: 0.7
+
+spam_messages:
+  # Spanish warning message shown to users approaching spam limit
+  warning_message_es: "Creemos que tu mensaje es spam. Después de 5 avisos como este procederemos a bloquear tu número."
+  # Spanish blocked message shown to users marked as spam
+  blocked_message_es: "Lo siento, te hemos clasificado como spam y no volveremos a responder tus mensajes. Si se trata de un error envía un email a errores@test.com y encantados revisaremos tu caso."
+  # Support email for spam appeals
+  support_email: "errores@test.com"
+
+ai_models:
+  # AWS Bedrock model configuration
+  bedrock_model_id: "anthropic.claude-3-haiku-20240307-v1:0"
+  bedrock_version: "bedrock-2023-05-31"
+  # Token limits for AI responses
+  max_tokens_spam_detection: 200
+  max_tokens_conversation: 300
+
+# Character limits for responses
+reply_length:
+  whatsapp:
+    max_response_characters: 199
+    character_limit_fallback: 280
+    character_limit_truncate: 277
+  
+    # Number of previous messages to include in conversation context
+    conversation_history_limit: 10

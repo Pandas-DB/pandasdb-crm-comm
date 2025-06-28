@@ -284,7 +284,8 @@ resources:
                     - lambda:InvokeFunction
                   Resource:
                     - !GetAtt CheckContentLambdaFunction.Arn
-                    - !GetAtt CheckPhoneSpammerLambdaFunction.Arn
+                    - !GetAtt GetOrCreateLeadLambdaFunction.Arn
+                    - !GetAtt CheckLeadSpammerLambdaFunction.Arn
                     - !GetAtt DetectSpamLambdaFunction.Arn
                     - !GetAtt GenerateSpamResponseLambdaFunction.Arn
                     - !GetAtt GenerateAiResponseLambdaFunction.Arn
