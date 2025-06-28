@@ -70,14 +70,3 @@ chatApi:
         method: post
         cors: true
         private: true
-
-leadsApi:
-  handler: src/handlers/api/leads_api.lambda_handler
-  name: ${self:service}-${self:provider.stage}-leads-api
-  description: Create and manage leads with contact methods
-  events:
-    - http:
-        path: /api/leads
-        method: post
-        cors: true
-        private: true

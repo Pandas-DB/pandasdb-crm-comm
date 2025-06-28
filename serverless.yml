@@ -312,11 +312,7 @@ resources:
     ChatApiUrl:
       Description: "API URL for Chat"
       Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/chat"
-    
-    LeadsApiUrl:
-      Description: "API URL for Lead Management"
-      Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/api/leads"
-    
+
     KnowledgeBaseBucket:
       Description: "S3 Bucket for Knowledge Base"
       Value: !Ref KnowledgeBaseBucket
