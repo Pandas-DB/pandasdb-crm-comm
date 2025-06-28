@@ -1,0 +1,138 @@
+# DynamoDB Tables for PandasDB CRM Communication System
+
+Resources:
+  # DynamoDB Tables
+  LeadsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ${self:service}-${self:provider.stage}-leads
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+  
+  ContactMethodsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ${self:service}-${self:provider.stage}-contact-methods
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: lead_id
+          AttributeType: S
+        - AttributeName: type_value
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: lead-id-index
+          KeySchema:
+            - AttributeName: lead_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: type-value-index
+          KeySchema:
+            - AttributeName: type_value
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+  
+  ContactMethodSettingsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ${self:service}-${self:provider.stage}-contact-method-settings
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: contact_method_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: contact-method-id-index
+          KeySchema:
+            - AttributeName: contact_method_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+  
+  ActivitiesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ${self:service}-${self:provider.stage}-activities
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: lead_id
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: lead-id-created-at-index
+          KeySchema:
+            - AttributeName: lead_id
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+  
+  ActivityContentTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ${self:service}-${self:provider.stage}-activity-content
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: activity_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: activity-id-index
+          KeySchema:
+            - AttributeName: activity_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+  
+  SpamActivitiesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ${self:service}-${self:provider.stage}-spam-activities
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: lead_id
+          AttributeType: S
+        - AttributeName: spam_date
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: lead-id-spam-date-index
+          KeySchema:
+            - AttributeName: lead_id
+              KeyType: HASH
+            - AttributeName: spam_date
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL

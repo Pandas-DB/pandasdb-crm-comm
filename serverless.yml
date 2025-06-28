@@ -73,253 +73,118 @@ provider:
             - !Sub "${ActivitiesTable.Arn}/index/*"
             - !Sub "${SpamActivitiesTable.Arn}/index/*"
 
-functions: ${file(lambda-functions.yml)}
+functions: ${file(infra/lambda-functions.yml)}
 
 resources:
-  Resources:
+  - ${file(infra/dynamodb_schema.yml)}
+  - Resources:
 
-    # API Gateway Usage Plan for Rate Limiting
-    ApiUsagePlan:
-      Type: AWS::ApiGateway::UsagePlan
-      Properties:
-        UsagePlanName: ${self:service}-${self:provider.stage}-usage-plan
-        Description: Usage plan for WhatsApp webhook rate limiting
-        ApiStages:
-          - ApiId: !Ref ApiGatewayRestApi
-            Stage: ${self:provider.stage}
-        Throttle:
-          RateLimit: 10      # 10 requests per second
-          BurstLimit: 20     # 20 concurrent requests max
-        Quota:
-          Limit: 10000       # 10000 requests per day
-          Period: DAY
+      # API Gateway Usage Plan for Rate Limiting
+      ApiUsagePlan:
+        Type: AWS::ApiGateway::UsagePlan
+        Properties:
+          UsagePlanName: ${self:service}-${self:provider.stage}-usage-plan
+          Description: Usage plan for WhatsApp webhook rate limiting
+          ApiStages:
+            - ApiId: !Ref ApiGatewayRestApi
+              Stage: ${self:provider.stage}
+          Throttle:
+            RateLimit: 10      # 10 requests per second
+            BurstLimit: 20     # 20 concurrent requests max
+          Quota:
+            Limit: 10000       # 10000 requests per day
+            Period: DAY
 
-    CrmApiKey:
-      Type: AWS::ApiGateway::ApiKey
-      Properties:
-        Name: ${self:service}-${self:provider.stage}-api-key
-        Description: API Key for CRM Communication System
-        Enabled: true
+      CrmApiKey:
+        Type: AWS::ApiGateway::ApiKey
+        Properties:
+          Name: ${self:service}-${self:provider.stage}-api-key
+          Description: API Key for CRM Communication System
+          Enabled: true
 
-    ApiUsagePlanKey:
-      Type: AWS::ApiGateway::UsagePlanKey
-      DependsOn:
-        - CrmApiKey
-        - ApiUsagePlan
-      Properties:
-        KeyId: !Ref CrmApiKey
-        KeyType: API_KEY
-        UsagePlanId: !Ref ApiUsagePlan
+      ApiUsagePlanKey:
+        Type: AWS::ApiGateway::UsagePlanKey
+        DependsOn:
+          - CrmApiKey
+          - ApiUsagePlan
+        Properties:
+          KeyId: !Ref CrmApiKey
+          KeyType: API_KEY
+          UsagePlanId: !Ref ApiUsagePlan
 
-    # DynamoDB Tables
-    LeadsTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:service}-${self:provider.stage}-leads
-        BillingMode: PAY_PER_REQUEST
-        AttributeDefinitions:
-          - AttributeName: id
-            AttributeType: S
-        KeySchema:
-          - AttributeName: id
-            KeyType: HASH
-        StreamSpecification:
-          StreamViewType: NEW_AND_OLD_IMAGES
-    
-    ContactMethodsTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:service}-${self:provider.stage}-contact-methods
-        BillingMode: PAY_PER_REQUEST
-        AttributeDefinitions:
-          - AttributeName: id
-            AttributeType: S
-          - AttributeName: lead_id
-            AttributeType: S
-          - AttributeName: type_value
-            AttributeType: S
-        KeySchema:
-          - AttributeName: id
-            KeyType: HASH
-        GlobalSecondaryIndexes:
-          - IndexName: lead-id-index
-            KeySchema:
-              - AttributeName: lead_id
-                KeyType: HASH
-            Projection:
-              ProjectionType: ALL
-          - IndexName: type-value-index
-            KeySchema:
-              - AttributeName: type_value
-                KeyType: HASH
-            Projection:
-              ProjectionType: ALL
-    
-    ContactMethodSettingsTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:service}-${self:provider.stage}-contact-method-settings
-        BillingMode: PAY_PER_REQUEST
-        AttributeDefinitions:
-          - AttributeName: id
-            AttributeType: S
-          - AttributeName: contact_method_id
-            AttributeType: S
-        KeySchema:
-          - AttributeName: id
-            KeyType: HASH
-        GlobalSecondaryIndexes:
-          - IndexName: contact-method-id-index
-            KeySchema:
-              - AttributeName: contact_method_id
-                KeyType: HASH
-            Projection:
-              ProjectionType: ALL
-    
-    ActivitiesTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:service}-${self:provider.stage}-activities
-        BillingMode: PAY_PER_REQUEST
-        AttributeDefinitions:
-          - AttributeName: id
-            AttributeType: S
-          - AttributeName: lead_id
-            AttributeType: S
-          - AttributeName: created_at
-            AttributeType: S
-        KeySchema:
-          - AttributeName: id
-            KeyType: HASH
-        GlobalSecondaryIndexes:
-          - IndexName: lead-id-created-at-index
-            KeySchema:
-              - AttributeName: lead_id
-                KeyType: HASH
-              - AttributeName: created_at
-                KeyType: RANGE
-            Projection:
-              ProjectionType: ALL
-    
-    ActivityContentTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:service}-${self:provider.stage}-activity-content
-        BillingMode: PAY_PER_REQUEST
-        AttributeDefinitions:
-          - AttributeName: id
-            AttributeType: S
-          - AttributeName: activity_id
-            AttributeType: S
-        KeySchema:
-          - AttributeName: id
-            KeyType: HASH
-        GlobalSecondaryIndexes:
-          - IndexName: activity-id-index
-            KeySchema:
-              - AttributeName: activity_id
-                KeyType: HASH
-            Projection:
-              ProjectionType: ALL
-    
-    SpamActivitiesTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:service}-${self:provider.stage}-spam-activities
-        BillingMode: PAY_PER_REQUEST
-        AttributeDefinitions:
-          - AttributeName: id
-            AttributeType: S
-          - AttributeName: lead_id
-            AttributeType: S
-          - AttributeName: spam_date
-            AttributeType: S
-        KeySchema:
-          - AttributeName: id
-            KeyType: HASH
-        GlobalSecondaryIndexes:
-          - IndexName: lead-id-spam-date-index
-            KeySchema:
-              - AttributeName: lead_id
-                KeyType: HASH
-              - AttributeName: spam_date
-                KeyType: RANGE
-            Projection:
-              ProjectionType: ALL
+      # S3 Bucket for Knowledge Base
+      KnowledgeBaseBucket:
+        Type: AWS::S3::Bucket
+        Properties:
+          PublicAccessBlockConfiguration:
+            BlockPublicAcls: true
+            BlockPublicPolicy: true
+            IgnorePublicAcls: true
+            RestrictPublicBuckets: true
+          VersioningConfiguration:
+            Status: Enabled
+          BucketEncryption:
+            ServerSideEncryptionConfiguration:
+              - ServerSideEncryptionByDefault:
+                  SSEAlgorithm: AES256
+      
+      # IAM Role for Step Functions
+      StepFunctionsRole:
+        Type: AWS::IAM::Role
+        Properties:
+          AssumeRolePolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Principal:
+                  Service: states.amazonaws.com
+                Action: sts:AssumeRole
+          Policies:
+            - PolicyName: StepFunctionsExecutionPolicy
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - lambda:InvokeFunction
+                    Resource:
+                      - !GetAtt CheckContentLambdaFunction.Arn
+                      - !GetAtt GetOrCreateLeadLambdaFunction.Arn
+                      - !GetAtt CheckLeadSpammerLambdaFunction.Arn
+                      - !GetAtt DetectSpamLambdaFunction.Arn
+                      - !GetAtt CreateActivityLambdaFunction.Arn
+                      - !GetAtt GenerateResponseLambdaFunction.Arn
+                      - !GetAtt GenerateSpamResponseLambdaFunction.Arn
+                      - !GetAtt SendMessageLambdaFunction.Arn
 
-    # S3 Bucket for Knowledge Base
-    KnowledgeBaseBucket:
-      Type: AWS::S3::Bucket
-      Properties:
-        PublicAccessBlockConfiguration:
-          BlockPublicAcls: true
-          BlockPublicPolicy: true
-          IgnorePublicAcls: true
-          RestrictPublicBuckets: true
-        VersioningConfiguration:
-          Status: Enabled
-        BucketEncryption:
-          ServerSideEncryptionConfiguration:
-            - ServerSideEncryptionByDefault:
-                SSEAlgorithm: AES256
-    
-    # IAM Role for Step Functions
-    StepFunctionsRole:
-      Type: AWS::IAM::Role
-      Properties:
-        AssumeRolePolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service: states.amazonaws.com
-              Action: sts:AssumeRole
-        Policies:
-          - PolicyName: StepFunctionsExecutionPolicy
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - lambda:InvokeFunction
-                  Resource:
-                    - !GetAtt CheckContentLambdaFunction.Arn
-                    - !GetAtt GetOrCreateLeadLambdaFunction.Arn
-                    - !GetAtt CheckLeadSpammerLambdaFunction.Arn
-                    - !GetAtt DetectSpamLambdaFunction.Arn
-                    - !GetAtt CreateActivityLambdaFunction.Arn
-                    - !GetAtt GenerateResponseLambdaFunction.Arn
-                    - !GetAtt GenerateSpamResponseLambdaFunction.Arn
-                    - !GetAtt SendMessageLambdaFunction.Arn
+      # Step Functions State Machine
+      WhatsAppStateMachine:
+        Type: AWS::StepFunctions::StateMachine
+        Properties:
+          StateMachineName: ${self:service}-${self:provider.stage}-processor
+          RoleArn: !GetAtt StepFunctionsRole.Arn
+          Definition: ${file(infra/step-function-definition.yml)}
 
-    # Step Functions State Machine
-    WhatsAppStateMachine:
-      Type: AWS::StepFunctions::StateMachine
-      Properties:
-        StateMachineName: ${self:service}-${self:provider.stage}-processor
-        RoleArn: !GetAtt StepFunctionsRole.Arn
-        Definition: ${file(step-function-definition.yml)}
+  - Outputs:
+      WhatsAppWebhookUrl:
+        Description: "Webhook URL for Twilio WhatsApp"
+        Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/whatsapp"
+      
+      TelegramWebhookUrl:
+        Description: "Webhook URL for Telegram"
+        Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/telegram"
+      
+      ChatApiUrl:
+        Description: "API URL for Chat"
+        Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/chat"
 
-  Outputs:
-    WhatsAppWebhookUrl:
-      Description: "Webhook URL for Twilio WhatsApp"
-      Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/whatsapp"
-    
-    TelegramWebhookUrl:
-      Description: "Webhook URL for Telegram"
-      Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/telegram"
-    
-    ChatApiUrl:
-      Description: "API URL for Chat"
-      Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/chat"
-
-    KnowledgeBaseBucket:
-      Description: "S3 Bucket for Knowledge Base"
-      Value: !Ref KnowledgeBaseBucket
-    
-    StateMachineArn:
-      Description: "Step Functions State Machine ARN"
-      Value: !Ref WhatsAppStateMachine
+      KnowledgeBaseBucket:
+        Description: "S3 Bucket for Knowledge Base"
+        Value: !Ref KnowledgeBaseBucket
+      
+      StateMachineArn:
+        Description: "Step Functions State Machine ARN"
+        Value: !Ref WhatsAppStateMachine
 
 plugins:
   - serverless-dotenv-plugin

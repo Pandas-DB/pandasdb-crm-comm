@@ -11,19 +11,13 @@ provider:
   timeout: 30
   
   environment:
-    # Import table names from main stack
-    LEADS_TABLE: 
-      Fn::ImportValue: ${self:custom.mainStackName}-LeadsTable
-    CONTACT_METHODS_TABLE:
-      Fn::ImportValue: ${self:custom.mainStackName}-ContactMethodsTable
-    CONTACT_METHOD_SETTINGS_TABLE:
-      Fn::ImportValue: ${self:custom.mainStackName}-ContactMethodSettingsTable
-    ACTIVITIES_TABLE:
-      Fn::ImportValue: ${self:custom.mainStackName}-ActivitiesTable
-    ACTIVITY_CONTENT_TABLE:
-      Fn::ImportValue: ${self:custom.mainStackName}-ActivityContentTable
-    SPAM_ACTIVITIES_TABLE:
-      Fn::ImportValue: ${self:custom.mainStackName}-SpamActivitiesTable
+    # Direct table names using same naming convention as main stack
+    LEADS_TABLE: ${self:custom.mainStackName}-leads
+    CONTACT_METHODS_TABLE: ${self:custom.mainStackName}-contact-methods
+    CONTACT_METHOD_SETTINGS_TABLE: ${self:custom.mainStackName}-contact-method-settings
+    ACTIVITIES_TABLE: ${self:custom.mainStackName}-activities
+    ACTIVITY_CONTENT_TABLE: ${self:custom.mainStackName}-activity-content
+    SPAM_ACTIVITIES_TABLE: ${self:custom.mainStackName}-spam-activities
   
   iam:
     role:
@@ -43,28 +37,18 @@ provider:
             - dynamodb:Query
             - dynamodb:Scan
           Resource: 
-            - Fn::ImportValue: ${self:custom.mainStackName}-LeadsTableArn
-            - Fn::ImportValue: ${self:custom.mainStackName}-ContactMethodsTableArn
-            - Fn::ImportValue: ${self:custom.mainStackName}-ContactMethodSettingsTableArn
-            - Fn::ImportValue: ${self:custom.mainStackName}-ActivitiesTableArn
-            - Fn::ImportValue: ${self:custom.mainStackName}-ActivityContentTableArn
-            - Fn::ImportValue: ${self:custom.mainStackName}-SpamActivitiesTableArn
-            - Fn::Sub:
-              - "${LeadsTableArn}/index/*"
-              - LeadsTableArn:
-                  Fn::ImportValue: ${self:custom.mainStackName}-LeadsTableArn
-            - Fn::Sub:
-              - "${ContactMethodsTableArn}/index/*"
-              - ContactMethodsTableArn:
-                  Fn::ImportValue: ${self:custom.mainStackName}-ContactMethodsTableArn
-            - Fn::Sub:
-              - "${ActivitiesTableArn}/index/*"
-              - ActivitiesTableArn:
-                  Fn::ImportValue: ${self:custom.mainStackName}-ActivitiesTableArn
-            - Fn::Sub:
-              - "${SpamActivitiesTableArn}/index/*"
-              - SpamActivitiesTableArn:
-                  Fn::ImportValue: ${self:custom.mainStackName}-SpamActivitiesTableArn
+            - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:custom.mainStackName}-leads"
+            - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:custom.mainStackName}-contact-methods"
+            - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:custom.mainStackName}-contact-method-settings"
+            - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:custom.mainStackName}-activities"
+            - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:custom.mainStackName}-activity-content"
+            - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:custom.mainStackName}-spam-activities"
+            - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:custom.mainStackName}-leads/index/*"
+            - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:custom.mainStackName}-contact-methods/index/*"
+            - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:custom.mainStackName}-contact-method-settings/index/*"
+            - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:custom.mainStackName}-activities/index/*"
+            - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:custom.mainStackName}-activity-content/index/*"
+            - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:custom.mainStackName}-spam-activities/index/*"
 
 functions:
   # Lead Management
@@ -183,10 +167,10 @@ resources:
       Properties:
         BucketName: ${self:service}-${self:provider.stage}
         PublicAccessBlockConfiguration:
-          BlockPublicAcls: false
-          BlockPublicPolicy: false
-          IgnorePublicAcls: false
-          RestrictPublicBuckets: false
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
         WebsiteConfiguration:
           IndexDocument: index.html
           ErrorDocument: index.html
@@ -197,7 +181,7 @@ resources:
               AllowedOrigins: ['*']
               MaxAge: 3600
     
-    # S3 Bucket Policy for Public Read
+    # S3 Bucket Policy for CloudFront Access
     BackofficeBucketPolicy:
       Type: AWS::S3::BucketPolicy
       Properties:
@@ -205,18 +189,26 @@ resources:
         PolicyDocument:
           Version: '2012-10-17'
           Statement:
-            - Sid: PublicReadGetObject
+            - Sid: AllowCloudFrontServicePrincipal
               Effect: Allow
-              Principal: "*"
+              Principal:
+                Service: cloudfront.amazonaws.com
               Action: s3:GetObject
               Resource: !Sub "${BackofficeBucket}/*"
+              Condition:
+                StringEquals:
+                  'AWS:SourceArn': !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${BackofficeDistribution}'
     
-    # CloudFront Origin Access Identity
-    BackofficeOriginAccessIdentity:
-      Type: AWS::CloudFront::OriginAccessIdentity
+    # CloudFront Origin Access Control (replaces deprecated OriginAccessIdentity)
+    BackofficeOriginAccessControl:
+      Type: AWS::CloudFront::OriginAccessControl
       Properties:
-        OriginAccessIdentityConfig:
-          Comment: !Sub 'OAI for ${self:service}-${self:provider.stage}'
+        OriginAccessControlConfig:
+          Name: !Sub '${self:service}-${self:provider.stage}-oac'
+          OriginAccessControlOriginType: s3
+          SigningBehavior: always
+          SigningProtocol: sigv4
+          Description: !Sub 'OAC for ${self:service}-${self:provider.stage}'
     
     # CloudFront Distribution for Global CDN
     BackofficeDistribution:
@@ -232,7 +224,8 @@ resources:
             - Id: BackofficeS3Origin
               DomainName: !GetAtt BackofficeBucket.RegionalDomainName
               S3OriginConfig:
-                OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${BackofficeOriginAccessIdentity}'
+                OriginAccessIdentity: ''
+              OriginAccessControlId: !Ref BackofficeOriginAccessControl
           
           DefaultCacheBehavior:
             TargetOriginId: BackofficeS3Origin
