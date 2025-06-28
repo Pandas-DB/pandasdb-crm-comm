@@ -5,12 +5,13 @@
 [![Python](https://img.shields.io/badge/Python-3.9-blue.svg)](https://www.python.org/)
 [![WhatsApp](https://img.shields.io/badge/WhatsApp-Business-green.svg)](https://business.whatsapp.com/)
 [![Telegram](https://img.shields.io/badge/Telegram-Bot-blue.svg)](https://core.telegram.org/bots)
+[![Gmail](https://img.shields.io/badge/Gmail-API-red.svg)](https://developers.google.com/gmail/api)
 
 > **AI-powered multi-platform CRM system for automated lead generation, spam detection, and sales automation**
 
 Transform your business communications with intelligent automation across multiple platforms. This serverless system handles lead capture, conversation management, spam filtering, and sales engagement - all powered by AWS Bedrock AI.
 
-**Supported Platforms**: WhatsApp, Telegram, Chat API (and easily extensible for more)
+**Supported Platforms**: WhatsApp, Telegram, Gmail, Chat API (and easily extensible for more)
 
 ---
 
@@ -48,7 +49,7 @@ Transform your business communications with intelligent automation across multip
 ### **🚀 Production-Ready Features**
 - **Intelligent Spam Detection**: AI-powered filtering with 95%+ accuracy
 - **Automated Sales Agent**: Context-aware responses with conversation history
-- **Multi-Platform Support**: WhatsApp, Telegram, Chat API, and easily extensible
+- **Multi-Platform Support**: WhatsApp, Telegram, Gmail, Chat API, and easily extensible
 - **Scalable Architecture**: Handle 1K to 1M+ messages per month
 - **Cost-Effective**: Pay only for what you use
 - **Real-time Analytics**: Comprehensive monitoring and lead insights
@@ -73,7 +74,7 @@ Transform your business communications with intelligent automation across multip
 - AWS CLI configured with appropriate permissions
 - Node.js 18+ and npm
 - Python 3.9+
-- Platform accounts: Twilio (WhatsApp Business API), Telegram Bot (optional)
+- Platform accounts: Twilio (WhatsApp Business API), Telegram Bot (optional), Google Service Account (Gmail, optional)
 
 ### **⚡ 5-Minute Deployment**
 
@@ -89,6 +90,9 @@ cp .env.example .env
 # export TWILIO_ACCOUNT_SID=your_actual_sid_here
 # export TWILIO_AUTH_TOKEN=your_actual_token_here
 # export TELEGRAM_BOT_TOKEN=your_telegram_bot_token (optional)
+# export GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}' (optional)
+# export GMAIL_USER_EMAIL=user@yourdomain.com (optional)
+# export GMAIL_POLL_INTERVAL_MINUTES=5 (optional)
 
 # 3. Deploy to AWS
 npm run deploy:dev
@@ -101,6 +105,7 @@ npm run deploy:dev
 # WhatsApp: https://your-api-id.execute-api.region.amazonaws.com/dev/whatsapp
 # Telegram: https://your-api-id.execute-api.region.amazonaws.com/dev/telegram
 # Chat API: https://your-api-id.execute-api.region.amazonaws.com/dev/chat
+# Gmail: Automatic polling every X minutes (no webhook required)
 ```
 
 ### **🎯 Optional: Deploy Monitoring Backoffice**
@@ -126,7 +131,7 @@ cd backoffice
 | **100K messages** | 20K | $52.15 | $467.50 | **$519.65** | $0.026 | $0.0052 |
 | **1M messages** | 200K | $485.20 | $4,675.00 | **$5,160.20** | $0.026 | $0.0052 |
 
-*Platform costs shown for WhatsApp via Twilio. Telegram and Chat API are free.
+*Platform costs shown for WhatsApp via Twilio. Telegram, Gmail, and Chat API are free.
 
 ### **AWS Services Breakdown (10K messages/month)**
 | Service | Monthly Cost | Purpose |
@@ -138,7 +143,7 @@ cd backoffice
 | **API Gateway** | $0.03 | Webhook endpoints |
 | **CloudWatch** | $0.31 | Monitoring and logs |
 
-> **💡 Pro Tip**: 85% of costs come from WhatsApp messaging. Telegram and Chat API are free, making them cost-effective alternatives. AWS infrastructure scales efficiently with excellent cost-per-message economics.
+> **💡 Pro Tip**: 85% of costs come from WhatsApp messaging. Telegram, Gmail, and Chat API are free, making them cost-effective alternatives. AWS infrastructure scales efficiently with excellent cost-per-message economics.
 
 ---
 
@@ -153,6 +158,11 @@ TWILIO_AUTH_TOKEN=your-twilio-auth-token
 
 # Optional for Telegram
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+
+# Optional for Gmail
+GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"your-project-id",...}'
+GMAIL_USER_EMAIL=user@yourdomain.com
+GMAIL_POLL_INTERVAL_MINUTES=5
 
 # Optional (AWS credentials can use CLI profile)
 AWS_ACCESS_KEY_ID=your-aws-access-key
@@ -170,6 +180,13 @@ AWS_DEFAULT_REGION=us-east-1
 1. Create bot via [@BotFather](https://t.me/botfather)
 2. Get bot token and add to environment variables
 3. Set webhook: `curl -X POST "https://api.telegram.org/bot{BOT_TOKEN}/setWebhook" -d "url=https://your-api.com/telegram"`
+
+**Gmail Setup**:
+1. Create Google Cloud Platform project and enable Gmail API
+2. Create service account with Gmail readonly permissions
+3. For G Suite/Workspace: Enable domain-wide delegation
+4. Add service account JSON to environment variables
+5. System automatically polls for new emails every X minutes (configurable)
 
 **Chat API Setup**:
 1. Use the provided API key from deployment output
@@ -247,6 +264,12 @@ telegramWebhook:
         path: /telegram
         method: post
 
+gmailPoller:
+  timeout: 60                # Increased timeout for Gmail API calls
+  events:
+    - schedule:
+        rate: rate(5 minutes) # Configurable via environment variable
+
 chatApi:
   events:
     - http:
@@ -272,20 +295,27 @@ whatsappWebhook:
         throttle:
           rate: 100          # Requests per second
           burst: 200         # Concurrent request burst
+
+gmailPoller:
+  handler: src/handlers/email/gmail_poller.lambda_handler
+  events:
+    - schedule:
+        rate: rate(${env:GMAIL_POLL_INTERVAL_MINUTES, '5'} minutes)
 ```
 
 ### **Recommended Settings by Usage**
 
-| Usage Level | Rate (req/sec) | Burst | Concurrency | Use Case |
-|-------------|----------------|-------|-------------|----------|
-| **Development** | 10 | 20 | 10 | Testing and small deployments |
-| **Small Business** | 50 | 100 | 25 | Up to 1K messages/day |
-| **Medium Business** | 100 | 200 | 50 | Up to 10K messages/day |
-| **Enterprise** | 500 | 1000 | 100 | High-volume production |
+| Usage Level | Rate (req/sec) | Burst | Concurrency | Gmail Poll | Use Case |
+|-------------|----------------|-------|-------------|------------|----------|
+| **Development** | 10 | 20 | 10 | 10 min | Testing and small deployments |
+| **Small Business** | 50 | 100 | 25 | 5 min | Up to 1K messages/day |
+| **Medium Business** | 100 | 200 | 50 | 3 min | Up to 10K messages/day |
+| **Enterprise** | 500 | 1000 | 100 | 1 min | High-volume production |
 
 ### **Security Features**
 
 - **Platform Signature Validation**: Rejects invalid requests (Twilio, Telegram)
+- **Gmail API Authentication**: Google Service Account with proper scopes
 - **API Gateway Rate Limiting**: Prevents traffic spikes
 - **Lambda Concurrency Limits**: Controls resource usage
 - **API Key Authentication**: Secure access for Chat API
@@ -312,10 +342,10 @@ whatsappWebhook:
 
 ### **Adding a New Platform**
 
-1. **Create webhook handler**: Add new file in `src/handlers/phone/`
-2. **Update infra/lambda-functions.yml**: Add webhook endpoint
+1. **Create webhook handler**: Add new file in `src/handlers/phone/` or `src/handlers/email/`
+2. **Update infra/lambda-functions.yml**: Add webhook endpoint or scheduled trigger
 3. **Import shared utilities**: Use `from handlers_aux import ...` for common functions
-4. **Test with new webhook URL**: `https://your-api.com/newplatform`
+4. **Test with new webhook URL**: `https://your-api.com/newplatform` or verify scheduled execution
 
 ### **Removing a Lambda Function**
 
@@ -383,9 +413,11 @@ pandasdb-crm-comm/
 │       │   ├── generate_response.py
 │       │   ├── generate_spam_response.py
 │       │   └── send_message.py       # Multi-platform message sender
-│       └── phone/                    # Platform-specific webhooks
-│           ├── whatsapp_webhook.py   # WhatsApp via Twilio
-│           └── telegram_webhook.py   # Telegram Bot API
+│       ├── phone/                    # Platform-specific webhooks
+│       │   ├── whatsapp_webhook.py   # WhatsApp via Twilio
+│       │   └── telegram_webhook.py   # Telegram Bot API
+│       └── email/                    # Email platform handlers
+│           └── gmail_poller.py       # Gmail polling via Google API
 ├── knowledge/
 │   └── system_prompt.txt             # AI knowledge base
 └── backoffice/                       # Optional monitoring interface
@@ -428,11 +460,14 @@ graph TB
     S[Optional Backoffice] --> T[CloudFront CDN]
     T --> U[Real-time Analytics]
     
+    V[Gmail Poller] -->|Scheduled| C
+    
     style A fill:#25D366
     style Q fill:#FF9900
     style P fill:#3F48CC
     style S fill:#9D4EDD
     style H fill:#FF6B6B
+    style V fill:#EA4335
 ```
 
 ### **Core Components**
@@ -444,7 +479,8 @@ graph TB
   - **Response Generation**: Separate `generate_response.py` and `generate_spam_response.py`
 - **💾 DynamoDB**: NoSQL database for leads and activities
 - **🧠 Bedrock AI**: Claude 3 for spam detection and sales responses
-- **📱 Multi-Platform Integration**: WhatsApp, Telegram, Chat API, extensible architecture
+- **📱 Multi-Platform Integration**: WhatsApp, Telegram, Gmail, Chat API, extensible architecture
+- **⏰ Gmail Polling**: Scheduled Lambda function for email monitoring
 - **📊 Optional Backoffice**: Web-based monitoring interface
 
 ### **Efficient Spam Handling**
@@ -495,6 +531,10 @@ curl -X POST "https://your-api.com/chat" \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{"message":"Hello from chat","from":"test_user"}'
+
+# Test Gmail polling (check CloudWatch logs)
+aws logs filter-log-events --log-group-name /aws/lambda/gmail-poller \
+  --filter-pattern "Gmail"
 ```
 
 ### **Performance Testing**
@@ -569,6 +609,7 @@ Goal: Schedule meetings while answering questions
 **Supported Platforms**
 - ✅ **WhatsApp**: Text messages, media, contact capture, status tracking
 - ✅ **Telegram**: Text messages, user information, bot commands
+- ✅ **Gmail**: Email monitoring, subject/body processing, sender identification
 - ✅ **Chat API**: Direct API integration with authentication
 - 🔧 **Extensible**: Easy to add Discord, SMS, Facebook Messenger, etc.
 
@@ -577,13 +618,38 @@ Goal: Schedule meetings while answering questions
 - **Normalized Data**: All platforms converted to common format via `handlers_aux.py`
 - **Platform-Specific Configuration**: Individual character limits and settings per platform
 - **Routing**: Automatic platform detection and response routing
+- **Gmail Polling**: Configurable polling intervals (1-60 minutes)
 
 **Message Flow**
-1. **Incoming**: Platform → Dedicated Webhook → API Gateway → Processing
+1. **Incoming**: Platform → Dedicated Webhook/Poller → API Gateway → Processing
 2. **Lead Management**: Get/Create Lead → Check Spam Status
 3. **Efficient Routing**: Known spammers exit immediately, others continue to AI analysis
 4. **Activity Storage**: All processed messages stored with platform metadata
 5. **Outgoing**: Response → Platform-specific sender → Platform delivery
+
+### **📧 Gmail Integration Features**
+
+**Email Processing**
+- **Automated Polling**: Configurable intervals (default: 5 minutes)
+- **Smart Filtering**: Only processes new emails from polling window
+- **Full Content Extraction**: Subject lines, HTML/plain text body parsing
+- **Sender Identification**: Extracts names and email addresses
+- **Thread Management**: Maintains email conversation threads
+
+**Gmail API Integration**
+- **Service Account Authentication**: Secure Google API access
+- **Domain-wide Delegation**: Support for G Suite/Workspace accounts
+- **Read-only Access**: Minimal permissions for security
+- **Error Handling**: Graceful degradation when Gmail API unavailable
+- **Rate Limiting**: Respects Google API quotas
+
+**Configuration Options**
+```yaml
+# Environment variables for Gmail
+GOOGLE_SERVICE_ACCOUNT_JSON: Service account credentials
+GMAIL_USER_EMAIL: Target Gmail account (for domain delegation)
+GMAIL_POLL_INTERVAL_MINUTES: Polling frequency (1-60 minutes)
+```
 
 ### **📋 Leads Management API**
 
@@ -742,9 +808,17 @@ npm run deploy:dev
 ### **Platform Compliance**
 - **WhatsApp**: Uses official WhatsApp Business API, respects rate limits
 - **Telegram**: Follows Telegram Bot API guidelines
+- **Gmail**: Uses official Gmail API with read-only permissions and service account authentication
 - **Chat API**: Token-based authentication with secure key management
 - **Message Templates**: Support for approved templates where required
 - **Opt-out Handling**: Automatic unsubscribe management
+
+### **Gmail Security Features**
+- **Service Account Authentication**: No user passwords stored
+- **Read-only Access**: Minimal Gmail API permissions
+- **Domain-wide Delegation**: Secure access for G Suite/Workspace
+- **API Rate Limiting**: Respects Google API quotas
+- **Encrypted Credentials**: Service account JSON stored securely
 
 ---
 
@@ -759,7 +833,7 @@ npm run deploy:dev
 - 🔍 **Lead Lookup**: Search and view conversation history
 - 🚫 **Spam Monitoring**: Track flagged content and users
 - ⚙️ **System Health**: Monitor all components
-- 📱 **Platform Insights**: Performance metrics by platform
+- 📱 **Platform Insights**: Performance metrics by platform including Gmail polling status
 
 **Technical Details**
 - **Frontend**: Pure JavaScript, modern CSS with gradients
@@ -787,9 +861,10 @@ npm run remove-infra
 
 **Daily Insights**
 - Total leads in system
-- Message volume and trends by platform
+- Message volume and trends by platform (including email)
 - Spam detection rates
 - User classification status
+- Gmail polling performance metrics
 
 **Lead Management**
 - Individual conversation history across platforms
@@ -814,6 +889,7 @@ npm run remove-infra
 - High spam detection rates → Email notifications  
 - DynamoDB throttling → Auto-scaling triggers
 - API Gateway 4xx/5xx errors → Incident response
+- Gmail API failures → CloudWatch alerts
 
 **Performance Metrics**
 ```bash
@@ -823,6 +899,7 @@ npm run remove-infra
 - API success rate (> 99.9% target)
 - Cost per message (trending analysis)
 - Platform distribution and performance
+- Gmail polling success rate
 ```
 
 ### **Troubleshooting**
@@ -855,6 +932,24 @@ npm run remove-infra
    
    aws logs filter-log-events --log-group-name /aws/lambda/telegram-webhook \
      --filter-pattern "Telegram"
+   
+   aws logs filter-log-events --log-group-name /aws/lambda/gmail-poller \
+     --filter-pattern "Gmail"
+   ```
+
+4. **Gmail Integration Issues**
+   ```bash
+   # Check Gmail API authentication
+   aws logs filter-log-events --log-group-name /aws/lambda/gmail-poller \
+     --filter-pattern "Error initializing Gmail service"
+   
+   # Monitor polling frequency
+   aws logs filter-log-events --log-group-name /aws/lambda/gmail-poller \
+     --filter-pattern "Starting Gmail polling"
+   
+   # Check for API quota issues
+   aws logs filter-log-events --log-group-name /aws/lambda/gmail-poller \
+     --filter-pattern "quota"
    ```
 
 ### **Backup & Recovery**
@@ -915,6 +1010,7 @@ We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guideline
 - 📝 **Documentation**: Improve guides and tutorials
 - 🧪 **Testing**: Help test new features and releases
 - 📱 **New Platforms**: Add support for additional messaging platforms
+- 📧 **Email Integrations**: Enhance Gmail or add other email providers
 
 ---
 
@@ -931,7 +1027,7 @@ This project is licensed under the MIT License - see [LICENSE](./LICENSE) file f
 
 ### **Dependencies**
 - **AWS Services**: Subject to AWS pricing and terms
-- **Platform APIs**: Requires accounts for WhatsApp Business API, Telegram Bot API
+- **Platform APIs**: Requires accounts for WhatsApp Business API, Telegram Bot API, Google Cloud Platform (Gmail API)
 - **Bedrock AI**: Subject to AWS Bedrock terms and pricing
 
 ### **Disclaimer**
