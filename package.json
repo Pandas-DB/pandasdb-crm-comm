@@ -4,8 +4,8 @@
   "description": "PandasDB CRM Communication System using AWS Lambda, Step Functions, and Supabase",
   "scripts": {
     "deploy": "serverless deploy",
-    "deploy:dev": "npm run upload-config && npm run upload-knowledge && dotenv npx serverless deploy --stage dev",
-    "deploy:prod": "npm run upload-config && npm run upload-knowledge && dotenv npx serverless deploy --stage prod",
+    "deploy:dev": "dotenv npx serverless deploy --stage dev && npm run upload-config && npm run upload-knowledge",
+    "deploy:prod": "dotenv npx serverless deploy --stage prod && npm run upload-config && npm run upload-knowledge",
     "remove": "serverless remove",
     "logs": "serverless logs -f",
     "invoke": "serverless invoke -f",
