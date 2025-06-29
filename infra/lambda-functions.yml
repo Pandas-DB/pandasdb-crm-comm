@@ -74,7 +74,7 @@ chatApi:
 gmail-poller:
   handler: src/handlers/email/gmail_poller.lambda_handler
   description: Gmail polling handler that checks for new emails
-  timeout: 60  # Increased timeout for Gmail API calls
+  timeout: 60
   events:
     - schedule:
         rate: rate(${env:GMAIL_POLL_INTERVAL_MINUTES, '5'} minutes)
@@ -82,3 +82,9 @@ gmail-poller:
         description: "Poll Gmail for new emails every X minutes"
   environment:
     PLATFORM: gmail
+
+dailyAnalytics:
+  handler: src/handlers/backoffice/get_daily_analytics.lambda_handler
+  name: ${self:service}-${self:provider.stage}-daily-analytics
+  description: Get daily analytics and statistics for admin dashboard
+  timeout: 30

@@ -1,0 +1,111 @@
+Resources:
+  # Separate API Gateway for Admin
+  AdminRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: ${self:service}-${self:provider.stage}-admin-api
+      Description: Admin API for CRM system
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  AdminApiResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ParentId: !GetAtt AdminRestApi.RootResourceId
+      PathPart: analytics
+
+  AdminApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ResourceId: !Ref AdminApiResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DailyAnalyticsLambdaFunction.Arn}/invocations"
+
+  AdminApiOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ResourceId: !Ref AdminApiResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  AdminApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - AdminApiMethod
+      - AdminApiOptionsMethod
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      StageName: ${self:provider.stage}
+
+  AdminApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    DependsOn: AdminApiDeployment
+    Properties:
+      Name: ${self:service}-${self:provider.stage}-admin-api-key
+      Description: API Key for Admin Functions
+      Enabled: true
+
+  AdminUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    DependsOn: AdminApiDeployment
+    Properties:
+      UsagePlanName: ${self:service}-${self:provider.stage}-admin-usage-plan
+      Description: Usage plan for admin endpoints
+      ApiStages:
+        - ApiId: !Ref AdminRestApi
+          Stage: ${self:provider.stage}
+      Throttle:
+        RateLimit: 5
+        BurstLimit: 10
+      Quota:
+        Limit: 1000
+        Period: DAY
+
+  AdminUsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref AdminApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref AdminUsagePlan
+
+  AdminLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref DailyAnalyticsLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${AdminRestApi}/*/*"
+
+Outputs:
+  AdminApiUrl:
+    Description: "Admin API URL"
+    Value: !Sub "https://${AdminRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/analytics"
+  
+  AdminApiKey:
+    Description: "Admin API Key"
+    Value: !Ref AdminApiKey

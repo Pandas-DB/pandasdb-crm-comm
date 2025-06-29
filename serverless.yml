@@ -80,6 +80,7 @@ functions: ${file(infra/lambda-functions.yml)}
 
 resources:
   - ${file(infra/dynamodb_schema.yml)}
+  - ${file(infra/admin-api.yml)}
   - Resources:
 
       # API Gateway Usage Plan for Rate Limiting
@@ -188,6 +189,10 @@ resources:
       StateMachineArn:
         Description: "Step Functions State Machine ARN"
         Value: !Ref WhatsAppStateMachine
+
+      CrmApiKey:
+        Description: "CRM API Key"
+        Value: !Ref CrmApiKey
 
 plugins:
   - serverless-dotenv-plugin
