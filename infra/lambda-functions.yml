@@ -83,8 +83,27 @@ gmail-poller:
   environment:
     PLATFORM: gmail
 
+# ADMIN API Lambdas:
 dailyAnalytics:
   handler: src/handlers/backoffice/get_daily_analytics.lambda_handler
   name: ${self:service}-${self:provider.stage}-daily-analytics
   description: Get daily analytics and statistics for admin dashboard
+  timeout: 30
+
+getLeadDetails:
+  handler: src/handlers/backoffice/get_lead_details.lambda_handler
+  name: ${self:service}-${self:provider.stage}-get-lead-details
+  description: Get lead details with recent activities
+  timeout: 30
+
+getSpamActivities:
+  handler: src/handlers/backoffice/get_spam_activities.lambda_handler
+  name: ${self:service}-${self:provider.stage}-get-spam-activities
+  description: Get recent spam activities with details
+  timeout: 30
+  
+getSpamUsers:
+  handler: src/handlers/backoffice/get_spam_users.lambda_handler
+  name: ${self:service}-${self:provider.stage}-get-spam-users
+  description: Get users classified as spammers
   timeout: 30

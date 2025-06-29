@@ -9,18 +9,19 @@ Resources:
         Types:
           - REGIONAL
 
-  AdminApiResource:
+  # Analytics resource
+  AdminApiAnalyticsResource:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref AdminRestApi
       ParentId: !GetAtt AdminRestApi.RootResourceId
       PathPart: analytics
 
-  AdminApiMethod:
+  AdminApiAnalyticsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref AdminRestApi
-      ResourceId: !Ref AdminApiResource
+      ResourceId: !Ref AdminApiAnalyticsResource
       HttpMethod: GET
       AuthorizationType: NONE
       ApiKeyRequired: true
@@ -29,11 +30,153 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DailyAnalyticsLambdaFunction.Arn}/invocations"
 
-  AdminApiOptionsMethod:
+  AdminApiAnalyticsOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref AdminRestApi
-      ResourceId: !Ref AdminApiResource
+      ResourceId: !Ref AdminApiAnalyticsResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # Leads resource
+  AdminApiLeadsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ParentId: !GetAtt AdminRestApi.RootResourceId
+      PathPart: leads
+
+  AdminApiLeadIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ParentId: !Ref AdminApiLeadsResource
+      PathPart: "{lead_id}"
+
+  AdminApiLeadDetailsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ResourceId: !Ref AdminApiLeadIdResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetLeadDetailsLambdaFunction.Arn}/invocations"
+
+  AdminApiLeadDetailsOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ResourceId: !Ref AdminApiLeadIdResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # Spam resource
+  AdminApiSpamResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ParentId: !GetAtt AdminRestApi.RootResourceId
+      PathPart: spam
+
+  AdminApiSpamMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ResourceId: !Ref AdminApiSpamResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetSpamActivitiesLambdaFunction.Arn}/invocations"
+
+  AdminApiSpamOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ResourceId: !Ref AdminApiSpamResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # Spam Users resource
+  AdminApiSpamUsersResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ParentId: !Ref AdminApiSpamResource
+      PathPart: users
+
+  AdminApiSpamUsersMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ResourceId: !Ref AdminApiSpamUsersResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetSpamUsersLambdaFunction.Arn}/invocations"
+
+  AdminApiSpamUsersOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref AdminRestApi
+      ResourceId: !Ref AdminApiSpamUsersResource
       HttpMethod: OPTIONS
       AuthorizationType: NONE
       Integration:
@@ -56,8 +199,14 @@ Resources:
   AdminApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
-      - AdminApiMethod
-      - AdminApiOptionsMethod
+      - AdminApiAnalyticsMethod
+      - AdminApiAnalyticsOptionsMethod
+      - AdminApiLeadDetailsMethod
+      - AdminApiLeadDetailsOptionsMethod
+      - AdminApiSpamMethod
+      - AdminApiSpamOptionsMethod
+      - AdminApiSpamUsersMethod
+      - AdminApiSpamUsersOptionsMethod
     Properties:
       RestApiId: !Ref AdminRestApi
       StageName: ${self:provider.stage}
@@ -93,7 +242,7 @@ Resources:
       KeyType: API_KEY
       UsagePlanId: !Ref AdminUsagePlan
 
-  AdminLambdaPermission:
+  AdminAnalyticsLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref DailyAnalyticsLambdaFunction
@@ -101,10 +250,50 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${AdminRestApi}/*/*"
 
+  AdminLeadDetailsLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GetLeadDetailsLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${AdminRestApi}/*/*"
+
+  AdminSpamActivitiesLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GetSpamActivitiesLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${AdminRestApi}/*/*"
+
+  AdminSpamUsersLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GetSpamUsersLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${AdminRestApi}/*/*"
+
 Outputs:
   AdminApiUrl:
     Description: "Admin API URL"
+    Value: !Sub "https://${AdminRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}"
+  
+  AdminAnalyticsUrl:
+    Description: "Admin Analytics API URL"
     Value: !Sub "https://${AdminRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/analytics"
+
+  AdminLeadDetailsUrl:
+    Description: "Admin Lead Details API URL"
+    Value: !Sub "https://${AdminRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/leads/{lead_id}"
+
+  AdminSpamActivitiesUrl:
+    Description: "Admin Spam Activities API URL"
+    Value: !Sub "https://${AdminRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/spam"
+  
+  AdminSpamUsersUrl:
+    Description: "Admin Spam Users API URL"
+    Value: !Sub "https://${AdminRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}/spam/users"
   
   AdminApiKey:
     Description: "Admin API Key"
