@@ -73,7 +73,9 @@ provider:
             - !GetAtt SpamActivitiesTable.Arn
             - !Sub "${LeadsTable.Arn}/index/*"
             - !Sub "${ContactMethodsTable.Arn}/index/*"
+            - !Sub "${ContactMethodSettingsTable.Arn}/index/*"
             - !Sub "${ActivitiesTable.Arn}/index/*"
+            - !Sub "${ActivityContentTable.Arn}/index/*"
             - !Sub "${SpamActivitiesTable.Arn}/index/*"
 
 functions: ${file(infra/lambda-functions.yml)}
