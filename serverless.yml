@@ -64,6 +64,7 @@ provider:
             - dynamodb:DeleteItem
             - dynamodb:Query
             - dynamodb:Scan
+            - dynamodb:BatchWriteItem
           Resource: 
             - !GetAtt LeadsTable.Arn
             - !GetAtt ContactMethodsTable.Arn

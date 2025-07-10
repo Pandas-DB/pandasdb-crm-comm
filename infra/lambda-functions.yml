@@ -107,3 +107,21 @@ getSpamUsers:
   name: ${self:service}-${self:provider.stage}-get-spam-users
   description: Get users classified as spammers
   timeout: 30
+
+createLead:
+  handler: src/handlers/backoffice/create_leads.lambda_handler
+  name: ${self:service}-${self:provider.stage}-create-lead
+  description: Create a new lead with contact methods
+  timeout: 30
+
+listLeads:
+  handler: src/handlers/backoffice/list_leads.lambda_handler
+  name: ${self:service}-${self:provider.stage}-list-leads
+  description: List all leads with pagination
+  timeout: 30
+
+removeSpamActivities:
+  handler: src/handlers/backoffice/remove_spam_activities.lambda_handler
+  name: ${self:service}-${self:provider.stage}-remove-spam-activities
+  description: Remove spam activities for a lead
+  timeout: 30
