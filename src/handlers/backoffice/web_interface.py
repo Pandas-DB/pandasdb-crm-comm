@@ -455,14 +455,39 @@ def render_analytics_page(admin_api_key, base_url, start_date=None, end_date=Non
     
     return render_base_page("Analytics", content, "analytics", base_url)
 
-def render_leads_page(admin_api_key, base_url):
-    """Render leads management page"""
-    data = make_admin_api_call('/leads', admin_api_key)
+def render_leads_page(admin_api_key, base_url, search_query=None):
+    """Render leads management page with search functionality"""
+    
+    # Build API endpoint with search parameter
+    endpoint = '/leads'
+    if search_query:
+        endpoint += f'?search={urllib.parse.quote(search_query)}'
+    
+    data = make_admin_api_call(endpoint, admin_api_key)
     
     if 'error' in data:
         content = f'<div class="error">Error loading leads: {data["error"]}</div>'
     else:
         leads = data.get('leads', [])
+        
+        # Search bar
+        search_value = search_query if search_query else ''
+        search_bar_html = f"""
+        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <form method="GET" action="{base_url}" style="display: flex; align-items: center; gap: 15px;">
+                <input type="hidden" name="page" value="leads">
+                <div style="flex: 1;">
+                    <label for="search" style="margin-right: 10px; font-weight: 500;">Search:</label>
+                    <input type="text" id="search" name="search" value="{search_value}" 
+                           placeholder="Search by name or contact method..."
+                           style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                </div>
+                <button type="submit" class="btn">Search</button>
+                <a href="{base_url}?page=leads" class="btn" style="background: #6b7280; text-decoration: none;">Clear</a>
+            </form>
+        </div>
+        """
+        
         if leads:
             table_rows = []
             for lead in leads:
@@ -494,14 +519,21 @@ def render_leads_page(admin_api_key, base_url):
                 </tbody>
             </table>
             """
+            
+            # Show search results count
+            results_info = f"<p style='margin-bottom: 15px; color: #6b7280;'>Found {len(leads)} lead(s)" + (f" matching \"{search_query}\"" if search_query else "") + "</p>"
         else:
-            table_html = '<p>No leads found.</p>'
+            table_html = f"<p>{'No leads found matching your search.' if search_query else 'No leads found.'}</p>"
+            results_info = ""
         
         content = f"""
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h2>Leads Management</h2>
             <a href="{base_url}?page=create_lead" class="btn">Create Lead</a>
         </div>
+        
+        {search_bar_html}
+        {results_info}
         {table_html}
         """
     
@@ -806,7 +838,8 @@ def lambda_handler(event, context):
             end_date = query_params.get('end_date')
             return create_response(200, render_analytics_page(admin_api_key, base_url, start_date, end_date))
         elif page == 'leads':
-            return create_response(200, render_leads_page(admin_api_key, base_url))
+            search_query = query_params.get('search')
+            return create_response(200, render_leads_page(admin_api_key, base_url, search_query))
         elif page == 'spam':
             return create_response(200, render_spam_activities_page(admin_api_key, base_url))
         elif page == 'spam_users':
