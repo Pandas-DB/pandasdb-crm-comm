@@ -125,3 +125,20 @@ removeSpamActivities:
   name: ${self:service}-${self:provider.stage}-remove-spam-activities
   description: Remove spam activities for a lead
   timeout: 30
+
+backofficeWeb:
+  handler: src/handlers/backoffice/web_interface.lambda_handler
+  name: ${self:service}-${self:provider.stage}-backoffice-web
+  description: Secure web interface for CRM backoffice
+  timeout: 30
+  memorySize: 512
+  environment:
+    ADMIN_API_ID: !Ref AdminRestApi
+    SESSIONS_TABLE: !Ref BackofficeSessionsTable
+  events:
+    - http:
+        path: backoffice
+        method: ANY
+    - http:
+        path: backoffice/{proxy+}
+        method: ANY
