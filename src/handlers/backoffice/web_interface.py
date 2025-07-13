@@ -312,34 +312,145 @@ def render_dashboard(admin_api_key, base_url):
     """
     return render_base_page("Dashboard", content, "dashboard", base_url)
 
-def render_analytics_page(admin_api_key, base_url):
-    """Render analytics page with real data"""
-    data = make_admin_api_call('/analytics', admin_api_key)
+def render_analytics_page(admin_api_key, base_url, start_date=None, end_date=None):
+    """Render analytics page with real data and date filtering"""
+    
+    # Set default date range to last 90 days if not provided
+    if not start_date or not end_date:
+        end_date = datetime.utcnow().strftime('%Y-%m-%d')
+        start_date = (datetime.utcnow() - timedelta(days=90)).strftime('%Y-%m-%d')
+    
+    # Call analytics API with date range
+    endpoint = f'/analytics?start_date={start_date}&end_date={end_date}'
+    data = make_admin_api_call(endpoint, admin_api_key)
     
     if 'error' in data:
         content = f'<div class="error">Error loading analytics: {data["error"]}</div>'
     else:
+        # Generate chart data from daily analytics
+        daily_data = data.get('daily_analytics', [])
+        chart_labels = []
+        messages_data = []
+        spam_data = []
+        
+        for day in daily_data:
+            chart_labels.append(f"'{day.get('date', '')}'")
+            messages_data.append(day.get('messages', 0))
+            spam_data.append(day.get('spam', 0))
+        
+        chart_labels_str = '[' + ','.join(chart_labels) + ']'
+        messages_data_str = '[' + ','.join(map(str, messages_data)) + ']'
+        spam_data_str = '[' + ','.join(map(str, spam_data)) + ']'
+        
         content = f"""
         <h2>System Analytics</h2>
+        
+        <!-- Date Range Filter -->
+        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <form method="GET" action="{base_url}" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <input type="hidden" name="page" value="analytics">
+                <div>
+                    <label for="start_date" style="margin-right: 5px; font-weight: 500;">From:</label>
+                    <input type="date" id="start_date" name="start_date" value="{start_date}" 
+                           min="{(datetime.utcnow() - timedelta(days=365)).strftime('%Y-%m-%d')}" 
+                           max="{datetime.utcnow().strftime('%Y-%m-%d')}"
+                           style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                </div>
+                <div>
+                    <label for="end_date" style="margin-right: 5px; font-weight: 500;">To:</label>
+                    <input type="date" id="end_date" name="end_date" value="{end_date}"
+                           min="{(datetime.utcnow() - timedelta(days=365)).strftime('%Y-%m-%d')}" 
+                           max="{datetime.utcnow().strftime('%Y-%m-%d')}"
+                           style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                </div>
+                <button type="submit" class="btn">Apply Filter</button>
+                <a href="{base_url}?page=analytics" class="btn" style="background: #6b7280; text-decoration: none;">Reset (90 days)</a>
+            </form>
+        </div>
+        
+        <!-- Summary Cards -->
         <div class="stats">
             <div class="stat-card">
                 <h3>Total Leads</h3>
                 <div class="stat-number">{data.get('total_leads', 0)}</div>
             </div>
             <div class="stat-card">
-                <h3>Messages Today</h3>
-                <div class="stat-number">{data.get('messages_today', 0)}</div>
+                <h3>Messages (Period)</h3>
+                <div class="stat-number">{data.get('total_messages', 0)}</div>
             </div>
             <div class="stat-card">
-                <h3>Spam Today</h3>
-                <div class="stat-number">{data.get('spam_today', 0)}</div>
+                <h3>Spam (Period)</h3>
+                <div class="stat-number">{data.get('total_spam', 0)}</div>
             </div>
             <div class="stat-card">
                 <h3>Spam Percentage</h3>
                 <div class="stat-number">{data.get('spam_percentage', 0)}%</div>
             </div>
         </div>
-        <p><strong>Last Updated:</strong> {data.get('last_updated', 'Unknown')}</p>
+        
+        <!-- Daily Activity Chart -->
+        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-top: 20px;">
+            <h3>Daily Activity Chart</h3>
+            <canvas id="activityChart" width="400" height="200"></canvas>
+        </div>
+        
+        <p style="margin-top: 20px;"><strong>Last Updated:</strong> {data.get('last_updated', 'Unknown')}</p>
+        <p><strong>Date Range:</strong> {start_date} to {end_date}</p>
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+        <script>
+        const ctx = document.getElementById('activityChart').getContext('2d');
+        const activityChart = new Chart(ctx, {{
+            type: 'bar',
+            data: {{
+                labels: {chart_labels_str},
+                datasets: [{{
+                    label: 'Messages',
+                    data: {messages_data_str},
+                    backgroundColor: 'rgba(37, 99, 235, 0.8)',
+                    borderColor: 'rgba(37, 99, 235, 1)',
+                    borderWidth: 1
+                }}, {{
+                    label: 'Spam',
+                    data: {spam_data_str},
+                    backgroundColor: 'rgba(220, 38, 38, 0.8)',
+                    borderColor: 'rgba(220, 38, 38, 1)',
+                    borderWidth: 1
+                }}]
+            }},
+            options: {{
+                responsive: true,
+                plugins: {{
+                    title: {{
+                        display: true,
+                        text: 'Daily Messages vs Spam Activity'
+                    }},
+                    legend: {{
+                        display: true,
+                        position: 'top'
+                    }}
+                }},
+                scales: {{
+                    y: {{
+                        beginAtZero: true,
+                        ticks: {{
+                            stepSize: 1
+                        }}
+                    }},
+                    x: {{
+                        ticks: {{
+                            maxRotation: 45,
+                            minRotation: 45
+                        }}
+                    }}
+                }},
+                interaction: {{
+                    mode: 'index',
+                    intersect: false
+                }}
+            }}
+        }});
+        </script>
         """
     
     return render_base_page("Analytics", content, "analytics", base_url)
@@ -691,7 +802,9 @@ def lambda_handler(event, context):
         
         # Handle GET requests for different pages
         if page == 'analytics':
-            return create_response(200, render_analytics_page(admin_api_key, base_url))
+            start_date = query_params.get('start_date')
+            end_date = query_params.get('end_date')
+            return create_response(200, render_analytics_page(admin_api_key, base_url, start_date, end_date))
         elif page == 'leads':
             return create_response(200, render_leads_page(admin_api_key, base_url))
         elif page == 'spam':
