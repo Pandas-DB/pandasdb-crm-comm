@@ -149,6 +149,7 @@ backofficeWeb:
   environment:
     ADMIN_API_ID: !Ref AdminRestApi
     SESSIONS_TABLE: !Ref BackofficeSessionsTable
+    S3_KNOWLEDGE_BUCKET: !Ref KnowledgeBaseBucket
   events:
     - http:
         path: backoffice

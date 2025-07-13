@@ -17,6 +17,9 @@ logger.setLevel(logging.INFO)
 dynamodb = boto3.resource('dynamodb')
 sessions_table = None
 
+# S3 client
+s3_client = boto3.client('s3')
+
 def get_sessions_table():
     """Get DynamoDB sessions table"""
     global sessions_table
@@ -198,6 +201,41 @@ def get_base_url(event):
     stage = event.get('requestContext', {}).get('stage', 'dev')
     return f"/{stage}/backoffice"
 
+def get_system_prompt_from_s3():
+    """Get system prompt content from S3"""
+    try:
+        bucket_name = os.environ.get('S3_KNOWLEDGE_BUCKET')
+        if not bucket_name:
+            return None, "S3 bucket not configured"
+        
+        response = s3_client.get_object(
+            Bucket=bucket_name,
+            Key='knowledge/system_prompt.txt'
+        )
+        content = response['Body'].read().decode('utf-8')
+        return content, None
+    except Exception as e:
+        logger.error(f"Error getting system prompt from S3: {str(e)}")
+        return None, str(e)
+
+def save_system_prompt_to_s3(content):
+    """Save system prompt content to S3"""
+    try:
+        bucket_name = os.environ.get('S3_KNOWLEDGE_BUCKET')
+        if not bucket_name:
+            return False, "S3 bucket not configured"
+        
+        s3_client.put_object(
+            Bucket=bucket_name,
+            Key='knowledge/system_prompt.txt',
+            Body=content.encode('utf-8'),
+            ContentType='text/plain'
+        )
+        return True, None
+    except Exception as e:
+        logger.error(f"Error saving system prompt to S3: {str(e)}")
+        return False, str(e)
+
 def render_base_page(title, content, current_page='dashboard', base_url='/dev/backoffice'):
     """Render base page template with navigation"""
     nav_items = [
@@ -207,7 +245,8 @@ def render_base_page(title, content, current_page='dashboard', base_url='/dev/ba
        ('spam', 'Spam Activities', f'{base_url}?page=spam'),
        ('spam_users', 'Spam Users', f'{base_url}?page=spam_users'),
        ('spam_config', 'Spam Config', f'{base_url}?page=spam_config'),
-       ('integration', 'Integration', f'{base_url}?page=integration')
+       ('integration', 'Integration', f'{base_url}?page=integration'),
+       ('system_prompt', 'System Prompt', f'{base_url}?page=system_prompt')
     ]
     
     nav_html = ''.join([
@@ -253,6 +292,7 @@ def render_base_page(title, content, current_page='dashboard', base_url='/dev/ba
             .limits-table {{ width: 100%; border-collapse: collapse; }}
             .limits-table th, .limits-table td {{ padding: 8px 12px; border: 1px solid #d1d5db; }}
             .limits-table th {{ background: #f9fafb; }}
+            .prompt-editor {{ width: 100%; min-height: 400px; padding: 15px; border: 1px solid #d1d5db; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.5; }}
         </style>
     </head>
     <body>
@@ -1051,6 +1091,127 @@ def handle_integration_post(admin_api_key, form_data, base_url):
         """
         return render_base_page("Integration Error", content, "integration", base_url)
 
+def render_system_prompt_page(base_url):
+    """Render system prompt editor page"""
+    content, error = get_system_prompt_from_s3()
+    
+    if error:
+        content_html = f'<div class="error">Error loading system prompt: {error}</div>'
+        prompt_content = ""
+    else:
+        prompt_content = content if content else ""
+        content_html = ""
+    
+    page_content = f"""
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>System Prompt Editor</h2>
+        <div>
+            <button type="button" onclick="resetContent()" class="btn" style="background: #6b7280; margin-right: 10px;">Reset</button>
+            <button type="submit" form="promptForm" class="btn">Save Changes</button>
+        </div>
+    </div>
+    
+    {content_html}
+    
+    <div class="config-section">
+        <h3>AI Assistant System Prompt</h3>
+        <p style="color: #6b7280; margin-bottom: 15px;">
+            This prompt defines the behavior and knowledge of your AI assistant. It includes company information, 
+            product details, and interaction guidelines. Changes will take effect immediately after saving.
+        </p>
+        
+        <form id="promptForm" method="POST" action="{base_url}?page=system_prompt" onsubmit="return confirmSave()">
+            <div class="form-group">
+                <label for="prompt_content">System Prompt Content:</label>
+                <textarea id="prompt_content" name="prompt_content" class="prompt-editor" required>{prompt_content}</textarea>
+            </div>
+            
+            <div style="margin-top: 20px; padding: 15px; background: #f0fdf4; border-radius: 6px; border-left: 4px solid #16a34a;">
+                <h4 style="margin-top: 0; color: #15803d;">Guidelines for editing:</h4>
+                <ul style="color: #166534; margin: 0;">
+                    <li>Keep the assistant focused on sales and lead generation</li>
+                    <li>Maintain the character limit (280 characters for responses)</li>
+                    <li>Ensure company information is accurate and up-to-date</li>
+                    <li>Test changes with the chat interface after saving</li>
+                </ul>
+            </div>
+        </form>
+    </div>
+    
+    <script>
+    let originalContent = `{prompt_content}`;
+    
+    function confirmSave() {{
+        const currentContent = document.getElementById('prompt_content').value;
+        if (currentContent !== originalContent) {{
+            return confirm('Are you sure you want to save these changes to the system prompt? This will affect all AI interactions immediately.');
+        }}
+        return true;
+    }}
+    
+    function resetContent() {{
+        if (confirm('Are you sure you want to reset the content to the original version? All unsaved changes will be lost.')) {{
+            document.getElementById('prompt_content').value = originalContent;
+        }}
+    }}
+    
+    // Track changes
+    document.getElementById('prompt_content').addEventListener('input', function() {{
+        const hasChanges = this.value !== originalContent;
+        const saveButton = document.querySelector('button[type="submit"]');
+        if (hasChanges) {{
+            saveButton.style.background = '#dc2626';
+            saveButton.textContent = 'Save Changes*';
+        }} else {{
+            saveButton.style.background = '#2563eb';
+            saveButton.textContent = 'Save Changes';
+        }}
+    }});
+    </script>
+    """
+    
+    return render_base_page("System Prompt", page_content, "system_prompt", base_url)
+
+def handle_system_prompt_post(form_data, base_url):
+    """Handle system prompt form submission"""
+    try:
+        prompt_content = form_data.get('prompt_content', '').strip()
+        
+        if not prompt_content:
+            content = f"""
+            <div class="error">System prompt content cannot be empty.</div>
+            <a href="{base_url}?page=system_prompt" class="btn">Go Back</a>
+            """
+            return render_base_page("System Prompt Error", content, "system_prompt", base_url)
+        
+        # Save to S3
+        success, error = save_system_prompt_to_s3(prompt_content)
+        
+        if not success:
+            content = f"""
+            <div class="error">Error saving system prompt: {error}</div>
+            <a href="{base_url}?page=system_prompt" class="btn">Try Again</a>
+            """
+        else:
+            content = f"""
+            <div class="success">System prompt updated successfully!</div>
+            <p>The AI assistant will now use the updated prompt for all new conversations.</p>
+            <div style="margin-top: 20px;">
+                <a href="{base_url}?page=system_prompt" class="btn">Edit Again</a>
+                <a href="{base_url}" class="btn" style="background: #6b7280; text-decoration: none; margin-left: 10px;">Back to Dashboard</a>
+            </div>
+            """
+        
+        return render_base_page("System Prompt Result", content, "system_prompt", base_url)
+        
+    except Exception as e:
+        logger.error(f"Error processing system prompt update: {str(e)}")
+        content = f"""
+        <div class="error">Error processing system prompt update: {str(e)}</div>
+        <a href="{base_url}?page=system_prompt" class="btn">Try Again</a>
+        """
+        return render_base_page("System Prompt Error", content, "system_prompt", base_url)
+
 def lambda_handler(event, context):
     """Main Lambda handler for secure backoffice web interface"""
     
@@ -1160,6 +1321,18 @@ def lambda_handler(event, context):
                         form_data[key] = urllib.parse.unquote_plus(value)
                 
                 return create_response(200, handle_integration_post(admin_api_key, form_data, base_url))
+            elif page == 'system_prompt':
+                body = event.get('body', '')
+                if event.get('isBase64Encoded'):
+                    body = base64.b64decode(body).decode('utf-8')
+                
+                form_data = {}
+                for item in body.split('&'):
+                    if '=' in item:
+                        key, value = item.split('=', 1)
+                        form_data[key] = urllib.parse.unquote_plus(value)
+                
+                return create_response(200, handle_system_prompt_post(form_data, base_url))
         
         # Handle GET requests for different pages
         if page == 'analytics':
@@ -1185,6 +1358,8 @@ def lambda_handler(event, context):
             return create_response(200, render_spam_config_page(admin_api_key, base_url))
         elif page == 'integration':
             return create_response(200, render_integration_page(admin_api_key, base_url))
+        elif page == 'system_prompt':
+            return create_response(200, render_system_prompt_page(base_url))
         elif page == 'dashboard' or page == '':
             return create_response(200, render_dashboard(admin_api_key, base_url))
         else:
