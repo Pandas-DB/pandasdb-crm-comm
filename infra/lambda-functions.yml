@@ -126,6 +126,14 @@ removeSpamActivities:
   description: Remove spam activities for a lead
   timeout: 30
 
+configManagement:
+  handler: src/handlers/backoffice/config_management.lambda_handler
+  name: ${self:service}-${self:provider.stage}-config-management
+  description: Manage business configuration settings
+  timeout: 30
+  environment:
+    S3_KNOWLEDGE_BUCKET: !Ref KnowledgeBaseBucket
+
 backofficeWeb:
   handler: src/handlers/backoffice/web_interface.lambda_handler
   name: ${self:service}-${self:provider.stage}-backoffice-web

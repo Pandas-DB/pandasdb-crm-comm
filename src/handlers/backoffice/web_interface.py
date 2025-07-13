@@ -205,7 +205,8 @@ def render_base_page(title, content, current_page='dashboard', base_url='/dev/ba
        ('analytics', 'Analytics', f'{base_url}?page=analytics'),
        ('leads', 'Leads', f'{base_url}?page=leads'),
        ('spam', 'Spam Activities', f'{base_url}?page=spam'),
-       ('spam_users', 'Spam Users', f'{base_url}?page=spam_users')
+       ('spam_users', 'Spam Users', f'{base_url}?page=spam_users'),
+       ('spam_config', 'Spam Config', f'{base_url}?page=spam_config')
     ]
     
     nav_html = ''.join([
@@ -245,6 +246,12 @@ def render_base_page(title, content, current_page='dashboard', base_url='/dev/ba
             .form-group {{ margin-bottom: 15px; }}
             .form-group label {{ display: block; margin-bottom: 5px; font-weight: 500; }}
             .form-group input, .form-group textarea, .form-group select {{ width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; }}
+            .config-section {{ background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2563eb; }}
+            .config-section h3 {{ margin-top: 0; color: #1f2937; }}
+            .form-row {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }}
+            .limits-table {{ width: 100%; border-collapse: collapse; }}
+            .limits-table th, .limits-table td {{ padding: 8px 12px; border: 1px solid #d1d5db; }}
+            .limits-table th {{ background: #f9fafb; }}
         </style>
     </head>
     <body>
@@ -746,6 +753,198 @@ def handle_create_lead_post(admin_api_key, form_data, base_url):
     
     return render_base_page("Create Lead Result", content, "leads", base_url)
 
+def render_spam_config_page(admin_api_key, base_url):
+    """Render spam configuration page"""
+    data = make_admin_api_call('/config', admin_api_key)
+    
+    if 'error' in data:
+        content = f'<div class="error">Error loading configuration: {data["error"]}</div>'
+    else:
+        spam_detection = data.get('spam_detection', {})
+        spam_messages = data.get('spam_messages', {})
+        ai_models = data.get('ai_models', {})
+        reply_length = data.get('reply_length', {})
+        
+        # Format spam activities limits for display
+        spam_activities_limits = spam_detection.get('spam_activities_limits', [])
+        spam_limits_rows = []
+        for i, limit in enumerate(spam_activities_limits):
+            if isinstance(limit, list) and len(limit) >= 2:
+                days, count = limit[0], limit[1]
+                action = limit[2] if len(limit) > 2 else 'warn'
+            else:
+                days, count, action = '', '', 'warn'
+            spam_limits_rows.append(f"""
+            <tr>
+                <td><input type="number" name="spam_activities_limits_{i}_days" value="{days}" style="width: 80px;"></td>
+                <td><input type="number" name="spam_activities_limits_{i}_count" value="{count}" style="width: 80px;"></td>
+                <td><input type="text" name="spam_activities_limits_{i}_action" value="{action}" style="width: 100px;"></td>
+            </tr>
+            """)
+        
+        # Format message limits for display
+        message_limits = spam_detection.get('message_limits', [])
+        message_limits_rows = []
+        for i, limit in enumerate(message_limits):
+            if isinstance(limit, list) and len(limit) >= 2:
+                days, count = limit[0], limit[1]
+                action = limit[2] if len(limit) > 2 else 'warn'
+            else:
+                days, count, action = '', '', 'warn'
+            message_limits_rows.append(f"""
+            <tr>
+                <td><input type="number" name="message_limits_{i}_days" value="{days}" style="width: 80px;"></td>
+                <td><input type="number" name="message_limits_{i}_count" value="{count}" style="width: 80px;"></td>
+                <td><input type="text" name="message_limits_{i}_action" value="{action}" style="width: 100px;"></td>
+            </tr>
+            """)
+        
+        content = f"""
+        <h2>Spam Configuration</h2>
+        
+        <form method="POST" action="{base_url}?page=spam_config">
+            <!-- Spam Detection Settings -->
+            <div class="config-section">
+                <h3>Spam Detection Settings</h3>
+                
+                <div class="form-group">
+                    <label for="warning_threshold_offset">Warning Threshold Offset:</label>
+                    <input type="number" id="warning_threshold_offset" name="warning_threshold_offset" 
+                           value="{spam_detection.get('warning_threshold_offset', 5)}" min="0" max="50">
+                    <small style="color: #6b7280;">Days before limit to send warning</small>
+                </div>
+                
+                <!-- Spam Activities Limits -->
+                <div class="form-group">
+                    <label>Spam Activities Limits:</label>
+                    <table class="limits-table">
+                        <thead>
+                            <tr>
+                                <th>Days</th>
+                                <th>Count</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {''.join(spam_limits_rows)}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Message Limits -->
+                <div class="form-group">
+                    <label>Message Limits:</label>
+                    <table class="limits-table">
+                        <thead>
+                            <tr>
+                                <th>Days</th>
+                                <th>Count</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {''.join(message_limits_rows)}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Spam Messages -->
+            <div class="config-section">
+                <h3>Spam Response Messages</h3>
+                
+                <div class="form-group">
+                    <label for="warning_message_es">Warning Message (Spanish):</label>
+                    <textarea id="warning_message_es" name="warning_message_es" rows="3">{spam_messages.get('warning_message_es', '')}</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="blocked_message_es">Blocked Message (Spanish):</label>
+                    <textarea id="blocked_message_es" name="blocked_message_es" rows="3">{spam_messages.get('blocked_message_es', '')}</textarea>
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px; text-align: center;">
+                <button type="submit" class="btn" style="padding: 12px 24px; font-size: 16px;">Save Configuration</button>
+                <a href="{base_url}?page=spam_config" class="btn" style="background: #6b7280; text-decoration: none; padding: 12px 24px; margin-left: 10px;">Reset</a>
+            </div>
+        </form>
+        """
+    
+    return render_base_page("Spam Config", content, "spam_config", base_url)
+
+def handle_spam_config_post(admin_api_key, form_data, base_url):
+    """Handle spam configuration form submission"""
+    try:
+        # Parse spam activities limits
+        spam_activities_limits = []
+        i = 0
+        while f'spam_activities_limits_{i}_days' in form_data:
+            days = form_data.get(f'spam_activities_limits_{i}_days')
+            count = form_data.get(f'spam_activities_limits_{i}_count')
+            action = form_data.get(f'spam_activities_limits_{i}_action')
+            
+            if days and count and action:
+                spam_activities_limits.append({
+                    'days': int(days),
+                    'count': int(count),
+                    'action': action
+                })
+            i += 1
+        
+        # Parse message limits
+        message_limits = []
+        i = 0
+        while f'message_limits_{i}_days' in form_data:
+            days = form_data.get(f'message_limits_{i}_days')
+            count = form_data.get(f'message_limits_{i}_count')
+            action = form_data.get(f'message_limits_{i}_action')
+            
+            if days and count and action:
+                message_limits.append({
+                    'days': int(days),
+                    'count': int(count),
+                    'action': action
+                })
+            i += 1
+        
+        # Build configuration update object
+        config_update = {
+            'spam_detection': {
+                'spam_activities_limits': spam_activities_limits,
+                'message_limits': message_limits,
+                'warning_threshold_offset': int(form_data.get('warning_threshold_offset', 5))
+            },
+            'spam_messages': {
+                'warning_message_es': form_data.get('warning_message_es', ''),
+                'blocked_message_es': form_data.get('blocked_message_es', '')
+            }
+        }
+        
+        # Send update to API
+        result = make_admin_api_call('/config', admin_api_key, 'PUT', json.dumps(config_update))
+        
+        if 'error' in result:
+            content = f"""
+            <div class="error">Error updating configuration: {result['error']}</div>
+            <a href="{base_url}?page=spam_config" class="btn">Try Again</a>
+            """
+        else:
+            content = f"""
+            <div class="success">Configuration updated successfully!</div>
+            <a href="{base_url}?page=spam_config" class="btn">Back to Configuration</a>
+            """
+        
+        return render_base_page("Config Update Result", content, "spam_config", base_url)
+        
+    except Exception as e:
+        logger.error(f"Error processing config update: {str(e)}")
+        content = f"""
+        <div class="error">Error processing configuration update: {str(e)}</div>
+        <a href="{base_url}?page=spam_config" class="btn">Try Again</a>
+        """
+        return render_base_page("Config Update Error", content, "spam_config", base_url)
+
 def lambda_handler(event, context):
     """Main Lambda handler for secure backoffice web interface"""
     
@@ -831,6 +1030,18 @@ def lambda_handler(event, context):
                         form_data[key] = urllib.parse.unquote_plus(value)
                 
                 return create_response(200, handle_create_lead_post(admin_api_key, form_data, base_url))
+            elif page == 'spam_config':
+                body = event.get('body', '')
+                if event.get('isBase64Encoded'):
+                    body = base64.b64decode(body).decode('utf-8')
+                
+                form_data = {}
+                for item in body.split('&'):
+                    if '=' in item:
+                        key, value = item.split('=', 1)
+                        form_data[key] = urllib.parse.unquote_plus(value)
+                
+                return create_response(200, handle_spam_config_post(admin_api_key, form_data, base_url))
         
         # Handle GET requests for different pages
         if page == 'analytics':
@@ -852,6 +1063,8 @@ def lambda_handler(event, context):
                 return create_response(200, render_leads_page(admin_api_key, base_url))
         elif page == 'create_lead':
             return create_response(200, render_create_lead_page(base_url))
+        elif page == 'spam_config':
+            return create_response(200, render_spam_config_page(admin_api_key, base_url))
         elif page == 'dashboard' or page == '':
             return create_response(200, render_dashboard(admin_api_key, base_url))
         else:
