@@ -206,7 +206,8 @@ def render_base_page(title, content, current_page='dashboard', base_url='/dev/ba
        ('leads', 'Leads', f'{base_url}?page=leads'),
        ('spam', 'Spam Activities', f'{base_url}?page=spam'),
        ('spam_users', 'Spam Users', f'{base_url}?page=spam_users'),
-       ('spam_config', 'Spam Config', f'{base_url}?page=spam_config')
+       ('spam_config', 'Spam Config', f'{base_url}?page=spam_config'),
+       ('integration', 'Integration', f'{base_url}?page=integration')
     ]
     
     nav_html = ''.join([
@@ -762,8 +763,6 @@ def render_spam_config_page(admin_api_key, base_url):
     else:
         spam_detection = data.get('spam_detection', {})
         spam_messages = data.get('spam_messages', {})
-        ai_models = data.get('ai_models', {})
-        reply_length = data.get('reply_length', {})
         
         # Format spam activities limits for display
         spam_activities_limits = spam_detection.get('spam_activities_limits', [])
@@ -945,6 +944,113 @@ def handle_spam_config_post(admin_api_key, form_data, base_url):
         """
         return render_base_page("Config Update Error", content, "spam_config", base_url)
 
+def render_integration_page(admin_api_key, base_url):
+    """Render Twilio integration page"""
+    data = make_admin_api_call('/twilio', admin_api_key)
+    
+    if 'error' in data:
+        content = f'<div class="error">Error loading Twilio credentials: {data["error"]}</div>'
+    else:
+        account_sid = data.get('account_sid', '')
+        auth_token_masked = data.get('auth_token_masked', '')
+        has_credentials = data.get('has_credentials', False)
+        
+        status_html = ""
+        if has_credentials:
+            status_html = f"""
+            <div class="success" style="margin-bottom: 20px;">
+                Twilio credentials are configured
+            </div>
+            """
+        else:
+            status_html = f"""
+            <div class="error" style="margin-bottom: 20px;">
+                Twilio credentials are not configured
+            </div>
+            """
+        
+        content = f"""
+        <h2>Integration Configuration</h2>
+        
+        {status_html}
+        
+        <form method="POST" action="{base_url}?page=integration" onsubmit="return confirmUpdate()">
+            <div class="config-section">
+                <h3>Twilio Credentials</h3>
+                
+                <div class="form-group">
+                    <label for="account_sid">Account SID:</label>
+                    <input type="text" id="account_sid" name="account_sid" 
+                           value="{account_sid}" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" required>
+                    <small style="color: #6b7280;">Your Twilio Account SID (starts with AC)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="auth_token">Auth Token:</label>
+                    <input type="password" id="auth_token" name="auth_token" 
+                           placeholder="{'Current token: ' + auth_token_masked if auth_token_masked else 'Enter your Auth Token'}" required>
+                    <small style="color: #6b7280;">Your Twilio Auth Token (32 characters)</small>
+                </div>
+                
+                <div style="margin-top: 30px; text-align: center;">
+                    <button type="submit" class="btn" style="padding: 12px 24px; font-size: 16px;">Update Credentials</button>
+                    <a href="{base_url}?page=integration" class="btn" style="background: #6b7280; text-decoration: none; padding: 12px 24px; margin-left: 10px;">Cancel</a>
+                </div>
+            </div>
+        </form>
+        
+        <script>
+        function confirmUpdate() {{
+            return confirm('Are you sure you want to update the Twilio credentials? This will affect WhatsApp message sending functionality.');
+        }}
+        </script>
+        """
+    
+    return render_base_page("Integration", content, "integration", base_url)
+
+def handle_integration_post(admin_api_key, form_data, base_url):
+    """Handle Twilio integration form submission"""
+    try:
+        account_sid = form_data.get('account_sid', '').strip()
+        auth_token = form_data.get('auth_token', '').strip()
+        
+        if not account_sid or not auth_token:
+            content = f"""
+            <div class="error">Both Account SID and Auth Token are required.</div>
+            <a href="{base_url}?page=integration" class="btn">Try Again</a>
+            """
+            return render_base_page("Integration Error", content, "integration", base_url)
+        
+        # Send update to API
+        twilio_update = {
+            'account_sid': account_sid,
+            'auth_token': auth_token
+        }
+        
+        result = make_admin_api_call('/twilio', admin_api_key, 'PUT', json.dumps(twilio_update))
+        
+        if 'error' in result:
+            content = f"""
+            <div class="error">Error updating Twilio credentials: {result['error']}</div>
+            <a href="{base_url}?page=integration" class="btn">Try Again</a>
+            """
+        else:
+            content = f"""
+            <div class="success">Twilio credentials updated successfully!</div>
+            <p>Your WhatsApp messaging functionality is now configured.</p>
+            <a href="{base_url}?page=integration" class="btn">Back to Integration</a>
+            """
+        
+        return render_base_page("Integration Result", content, "integration", base_url)
+        
+    except Exception as e:
+        logger.error(f"Error processing Twilio integration update: {str(e)}")
+        content = f"""
+        <div class="error">Error processing Twilio credentials update: {str(e)}</div>
+        <a href="{base_url}?page=integration" class="btn">Try Again</a>
+        """
+        return render_base_page("Integration Error", content, "integration", base_url)
+
 def lambda_handler(event, context):
     """Main Lambda handler for secure backoffice web interface"""
     
@@ -1042,6 +1148,18 @@ def lambda_handler(event, context):
                         form_data[key] = urllib.parse.unquote_plus(value)
                 
                 return create_response(200, handle_spam_config_post(admin_api_key, form_data, base_url))
+            elif page == 'integration':
+                body = event.get('body', '')
+                if event.get('isBase64Encoded'):
+                    body = base64.b64decode(body).decode('utf-8')
+                
+                form_data = {}
+                for item in body.split('&'):
+                    if '=' in item:
+                        key, value = item.split('=', 1)
+                        form_data[key] = urllib.parse.unquote_plus(value)
+                
+                return create_response(200, handle_integration_post(admin_api_key, form_data, base_url))
         
         # Handle GET requests for different pages
         if page == 'analytics':
@@ -1065,6 +1183,8 @@ def lambda_handler(event, context):
             return create_response(200, render_create_lead_page(base_url))
         elif page == 'spam_config':
             return create_response(200, render_spam_config_page(admin_api_key, base_url))
+        elif page == 'integration':
+            return create_response(200, render_integration_page(admin_api_key, base_url))
         elif page == 'dashboard' or page == '':
             return create_response(200, render_dashboard(admin_api_key, base_url))
         else:

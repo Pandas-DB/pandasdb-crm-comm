@@ -134,6 +134,12 @@ configManagement:
   environment:
     S3_KNOWLEDGE_BUCKET: !Ref KnowledgeBaseBucket
 
+twilioCredentials:
+  handler: src/handlers/backoffice/update_twilio_credentials.lambda_handler
+  name: ${self:service}-${self:provider.stage}-twilio-credentials
+  description: Manage Twilio credentials
+  timeout: 30
+
 backofficeWeb:
   handler: src/handlers/backoffice/web_interface.lambda_handler
   name: ${self:service}-${self:provider.stage}-backoffice-web
