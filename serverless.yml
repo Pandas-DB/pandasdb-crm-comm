@@ -1,4 +1,4 @@
-service: pandasdb-crm-comm
+service: ${env:SERVICE_NAME, 'pandasdb-crm-comm'}
 
 frameworkVersion: '3'
 
