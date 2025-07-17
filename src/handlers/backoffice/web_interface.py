@@ -656,6 +656,10 @@ def render_spam_activities_page(admin_api_key, base_url, search_query=None, star
                     <td>{spam.get('phone', 'N/A')}</td>
                     <td title="{full_message}">{message_preview}</td>
                     <td>{spam.get('spam_reason', 'N/A')}</td>
+                    <td>
+                        <button onclick="deleteSpamActivity('{spam.get('lead_id', '')}', '{spam.get('id', '')}')" 
+                                class="btn btn-danger btn-small">Delete</button>
+                    </td>
                 </tr>
                 """)
             
@@ -668,6 +672,7 @@ def render_spam_activities_page(admin_api_key, base_url, search_query=None, star
                         <th>Phone</th>
                         <th>Message</th>
                         <th>Reason</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -687,6 +692,32 @@ def render_spam_activities_page(admin_api_key, base_url, search_query=None, star
             {filter_bar_html}
             {results_info}
             {table_html}
+            
+            <script>
+            function deleteSpamActivity(leadId, activityId) {{
+                if (confirm('Are you sure you want to delete this spam activity? This action cannot be undone.')) {{
+                    fetch('{base_url}?action=delete_spam&lead_id=' + leadId + '&spam_activity_id=' + activityId, {{
+                        method: 'POST',
+                        headers: {{
+                            'Content-Type': 'application/json',
+                        }}
+                    }})
+                    .then(response => response.json())
+                    .then(data => {{
+                        if (data.success) {{
+                            alert('Spam activity deleted successfully');
+                            location.reload();
+                        }} else {{
+                            alert('Error deleting spam activity: ' + (data.error || 'Unknown error'));
+                        }}
+                    }})
+                    .catch(error => {{
+                        console.error('Error:', error);
+                        alert('Error deleting spam activity');
+                    }});
+                }}
+            }}
+            </script>
             """
         else:
             search_text = f" matching \"{search_query}\"" if search_query else ""
@@ -802,18 +833,163 @@ def render_lead_detail_page(admin_api_key, lead_id, base_url):
         contact_methods_html += '</ul>'
         
         if activities:
-            activities_html = '<table class="table"><thead><tr><th>Date</th><th>Type</th><th>Content</th><th>Platform</th></tr></thead><tbody>'
-            for activity in activities:
-                activity_date = datetime.fromisoformat(activity.get('created_at', '').replace('Z', '+00:00')).strftime('%Y-%m-%d %H:%M')
-                activities_html += f"""
-                <tr>
-                    <td>{activity_date}</td>
-                    <td>{activity.get('activity_type', 'N/A')}</td>
-                    <td>{activity.get('content', 'N/A')[:100]}...</td>
-                    <td>{activity.get('platform', 'N/A')}</td>
-                </tr>
-                """
-            activities_html += '</tbody></table>'
+            # Show only last 10 messages by default
+            visible_activities = activities[-10:] if len(activities) > 10 else activities
+            hidden_count = len(activities) - len(visible_activities)
+            
+            activities_html = f'''
+            <div id="chat-container" style="background: #e5ddd5; padding: 20px; border-radius: 8px; max-height: 500px; overflow-y: auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            '''
+            
+            # Add "Load more messages" button if there are hidden messages
+            if hidden_count > 0:
+                activities_html += f'''
+                <div id="load-more-container" style="text-align: center; margin-bottom: 15px;">
+                    <button onclick="loadMoreMessages()" class="btn btn-small" style="background: #6b7280; font-size: 12px;">
+                        Load {hidden_count} older message{'s' if hidden_count != 1 else ''}
+                    </button>
+                </div>
+                <div id="older-messages" style="display: none;">
+                '''
+                
+                # Render older messages (hidden by default)
+                current_date = None
+                for activity in activities[:-10]:
+                    activity_datetime = datetime.fromisoformat(activity.get('created_at', '').replace('Z', '+00:00'))
+                    activity_time = activity_datetime.strftime('%H:%M')
+                    activity_date = activity_datetime.strftime('%Y-%m-%d')
+                    direction = activity.get('direction', 'inbound')
+                    
+                    # Show date separator if date changed
+                    if current_date != activity_date:
+                        current_date = activity_date
+                        date_display = activity_datetime.strftime('%d/%m/%Y')
+                        activities_html += f'''
+                        <div style="text-align: center; margin: 15px 0;">
+                            <span style="background: rgba(0,0,0,0.1); padding: 4px 12px; border-radius: 12px; font-size: 12px; color: #666;">{date_display}</span>
+                        </div>
+                        '''
+                    
+                    # Extract and render message content
+                    content_value = activity.get('content', 'N/A')
+                    
+                    if isinstance(content_value, dict):
+                        if direction == 'inbound':
+                            message_content = content_value.get('leadMessage', content_value.get('message', str(content_value)))
+                        else:
+                            message_content = content_value.get('assistantMessage', content_value.get('message', str(content_value)))
+                    elif isinstance(content_value, str):
+                        message_content = content_value
+                    else:
+                        message_content = str(content_value)
+                    
+                    if not message_content or message_content in ['N/A', 'None', '']:
+                        continue
+                    
+                    is_incoming = direction == 'inbound'
+                    
+                    if is_incoming:
+                        activities_html += f'''
+                        <div style="display: flex; justify-content: flex-start; margin-bottom: 8px;">
+                            <div style="background: white; padding: 8px 12px; border-radius: 18px; max-width: 70%; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                                <div style="font-size: 14px; line-height: 1.4; color: #333; word-wrap: break-word;">{message_content}</div>
+                                <div style="font-size: 11px; color: #999; margin-top: 4px; text-align: right;">{activity_time}</div>
+                            </div>
+                        </div>
+                        '''
+                    else:
+                        activities_html += f'''
+                        <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+                            <div style="background: #dcf8c6; padding: 8px 12px; border-radius: 18px; max-width: 70%; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                                <div style="font-size: 14px; line-height: 1.4; color: #333; word-wrap: break-word;">{message_content}</div>
+                                <div style="font-size: 11px; color: #999; margin-top: 4px; text-align: right;">{activity_time} ✓</div>
+                            </div>
+                        </div>
+                        '''
+                
+                activities_html += '''
+            </div>
+            
+            <script>
+            function loadMoreMessages() {
+                const olderMessages = document.getElementById('older-messages');
+                const loadMoreContainer = document.getElementById('load-more-container');
+                
+                olderMessages.style.display = 'block';
+                loadMoreContainer.style.display = 'none';
+            }
+            
+            // Scroll to bottom on page load (like WhatsApp)
+            window.addEventListener('load', function() {
+                const chatContainer = document.getElementById('chat-container');
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            });
+            </script>
+            '''  # Close older-messages div
+            
+            # Render visible messages (last 10)
+            current_date = None
+            for activity in visible_activities:
+                activity_datetime = datetime.fromisoformat(activity.get('created_at', '').replace('Z', '+00:00'))
+                activity_time = activity_datetime.strftime('%H:%M')
+                activity_date = activity_datetime.strftime('%Y-%m-%d')
+                direction = activity.get('direction', 'inbound')  # Get the direction
+                
+                # Show date separator if date changed
+                if current_date != activity_date:
+                    current_date = activity_date
+                    date_display = activity_datetime.strftime('%d/%m/%Y')
+                    activities_html += f'''
+                    <div style="text-align: center; margin: 15px 0;">
+                        <span style="background: rgba(0,0,0,0.1); padding: 4px 12px; border-radius: 12px; font-size: 12px; color: #666;">{date_display}</span>
+                    </div>
+                    '''
+                
+                # Extract message content properly
+                content_value = activity.get('content', 'N/A')
+                
+                # Handle both inbound and outbound messages
+                if isinstance(content_value, dict):
+                    # For inbound messages, use leadMessage
+                    # For outbound messages, use assistantMessage
+                    if direction == 'inbound':
+                        message_content = content_value.get('leadMessage', content_value.get('message', str(content_value)))
+                    else:  # outbound
+                        message_content = content_value.get('assistantMessage', content_value.get('message', str(content_value)))
+                elif isinstance(content_value, str):
+                    message_content = content_value
+                else:
+                    message_content = str(content_value)
+                
+                # Skip if no actual message content
+                if not message_content or message_content in ['N/A', 'None', '']:
+                    continue
+                
+                # Determine if it's incoming or outgoing based on direction
+                is_incoming = direction == 'inbound'
+                
+                if is_incoming:
+                    # Incoming message (left side, gray bubble)
+                    activities_html += f'''
+                    <div style="display: flex; justify-content: flex-start; margin-bottom: 8px;">
+                        <div style="background: white; padding: 8px 12px; border-radius: 18px; max-width: 70%; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                            <div style="font-size: 14px; line-height: 1.4; color: #333; word-wrap: break-word;">{message_content}</div>
+                            <div style="font-size: 11px; color: #999; margin-top: 4px; text-align: right;">{activity_time}</div>
+                        </div>
+                    </div>
+                    '''
+                else:
+                    # Outgoing message (right side, green bubble)
+                    activities_html += f'''
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+                        <div style="background: #dcf8c6; padding: 8px 12px; border-radius: 18px; max-width: 70%; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                            <div style="font-size: 14px; line-height: 1.4; color: #333; word-wrap: break-word;">{message_content}</div>
+                            <div style="font-size: 11px; color: #999; margin-top: 4px; text-align: right;">{activity_time} ✓</div>
+                        </div>
+                    </div>
+                    '''
+            
+            activities_html += '</div>'
         else:
             activities_html = '<p>No activities found for this lead.</p>'
         
@@ -1350,7 +1526,7 @@ def lambda_handler(event, context):
             )
         
         # Handle login
-        if http_method == 'POST' and not query_params.get('page'):
+        if http_method == 'POST' and not query_params.get('page') and not query_params.get('action'):
             # Parse form data
             body = event.get('body', '')
             if event.get('isBase64Encoded'):
@@ -1358,10 +1534,11 @@ def lambda_handler(event, context):
             
             # Simple form parsing
             form_data = {}
-            for item in body.split('&'):
-                if '=' in item:
-                    key, value = item.split('=', 1)
-                    form_data[key] = urllib.parse.unquote_plus(value)
+            if body:  # Only parse if body is not empty
+                for item in body.split('&'):
+                    if '=' in item:
+                        key, value = item.split('=', 1)
+                        form_data[key] = urllib.parse.unquote_plus(value)
             
             api_key = form_data.get('api_key')
             
@@ -1390,58 +1567,43 @@ def lambda_handler(event, context):
         if not admin_api_key:
             return create_response(200, render_login_page("Session expired"))
         
+        # Handle special actions
+        if query_params.get('action') == 'delete_spam':
+            lead_id = query_params.get('lead_id')
+            spam_activity_id = query_params.get('spam_activity_id')
+            
+            if not lead_id or not spam_activity_id:
+                return create_response(400, json.dumps({'error': 'Lead ID and Spam Activity ID are required'}), 'application/json')
+            
+            # Make API call to delete spam activity
+            result = make_admin_api_call(f'/leads/{lead_id}?spam_activity_id={spam_activity_id}', admin_api_key, 'DELETE')
+            
+            return create_response(200, json.dumps(result), 'application/json')
+        
         # Route to different pages
         page = query_params.get('page', 'analytics')
         
         # Handle POST requests for forms
         if http_method == 'POST':
-            if page == 'create_lead':
-                body = event.get('body', '')
-                if event.get('isBase64Encoded'):
-                    body = base64.b64decode(body).decode('utf-8')
-                
-                form_data = {}
+            body = event.get('body', '')
+            if event.get('isBase64Encoded'):
+                body = base64.b64decode(body).decode('utf-8')
+            
+            # Simple form parsing
+            form_data = {}
+            if body:  # Only parse if body is not empty
                 for item in body.split('&'):
                     if '=' in item:
                         key, value = item.split('=', 1)
                         form_data[key] = urllib.parse.unquote_plus(value)
-                
+            
+            if page == 'create_lead':
                 return create_response(200, handle_create_lead_post(admin_api_key, form_data, base_url))
             elif page == 'spam_config':
-                body = event.get('body', '')
-                if event.get('isBase64Encoded'):
-                    body = base64.b64decode(body).decode('utf-8')
-                
-                form_data = {}
-                for item in body.split('&'):
-                    if '=' in item:
-                        key, value = item.split('=', 1)
-                        form_data[key] = urllib.parse.unquote_plus(value)
-                
                 return create_response(200, handle_spam_config_post(admin_api_key, form_data, base_url))
             elif page == 'integration':
-                body = event.get('body', '')
-                if event.get('isBase64Encoded'):
-                    body = base64.b64decode(body).decode('utf-8')
-                
-                form_data = {}
-                for item in body.split('&'):
-                    if '=' in item:
-                        key, value = item.split('=', 1)
-                        form_data[key] = urllib.parse.unquote_plus(value)
-                
                 return create_response(200, handle_integration_post(admin_api_key, form_data, base_url))
             elif page == 'system_prompt':
-                body = event.get('body', '')
-                if event.get('isBase64Encoded'):
-                    body = base64.b64decode(body).decode('utf-8')
-                
-                form_data = {}
-                for item in body.split('&'):
-                    if '=' in item:
-                        key, value = item.split('=', 1)
-                        form_data[key] = urllib.parse.unquote_plus(value)
-                
                 return create_response(200, handle_system_prompt_post(form_data, base_url))
         
         # Handle GET requests for different pages

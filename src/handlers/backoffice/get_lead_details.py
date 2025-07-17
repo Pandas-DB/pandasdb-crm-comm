@@ -65,13 +65,13 @@ def lambda_handler(event, context):
             ExpressionAttributeValues={':lead_id': lead_id}
         )
         
-        # Get recent activities
+        # Get recent activities (fetch more to ensure we have enough after sorting)
         activities_response = activities_table.query(
             IndexName='lead-id-created-at-index',
             KeyConditionExpression='lead_id = :lead_id',
             ExpressionAttributeValues={':lead_id': lead_id},
             ScanIndexForward=False,
-            Limit=20
+            Limit=50  # Increased limit to get more activities
         )
         
         # Get activity content for each activity
@@ -89,9 +89,14 @@ def lambda_handler(event, context):
             
             activities_with_content.append(activity_data)
         
+        # Sort activities in chronological order (oldest first) for proper chat display
+        activities_with_content.sort(key=lambda x: x.get('created_at', ''))
+        
+        # Add contact methods to lead for frontend convenience
+        lead['contact_methods'] = convert_decimals(contact_response['Items'])
+        
         result = {
             'lead': convert_decimals(lead),
-            'contact_methods': convert_decimals(contact_response['Items']),
             'activities': convert_decimals(activities_with_content)
         }
         
