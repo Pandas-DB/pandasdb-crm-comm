@@ -188,12 +188,24 @@ def log_outbound_message(original_data, send_data, result, answer_to_activity_id
         timestamp = datetime.now().isoformat()
         activity_id = str(uuid.uuid4())
         
+        # Get lead_id and contact_method_id from the event (both normal and spam responses)
+        lead_id = original_data.get('lead_id', '')
+        contact_method_id = original_data.get('contact_method_id', '')
+        
+        # Validate required fields
+        if not lead_id:
+            logger.error(f"Missing lead_id in event data: {original_data}")
+            return
+        if not contact_method_id:
+            logger.error(f"Missing contact_method_id in event data: {original_data}")
+            return
+        
         # Create outbound activity record
         activities_table.put_item(
             Item={
                 'id': activity_id,
-                'lead_id': original_data.get('lead_id', ''),
-                'contact_method_id': original_data.get('contact_method_id', ''),
+                'lead_id': lead_id,
+                'contact_method_id': contact_method_id,
                 'activity_type': send_data.get('platform', 'unknown'),
                 'status': 'completed',
                 'direction': 'outbound',

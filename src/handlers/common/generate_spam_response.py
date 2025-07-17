@@ -25,6 +25,7 @@ def lambda_handler(event, context):
             flow_input = yaml.safe_load(flow_input)
             
         lead_id = event.get('lead_id')
+        contact_method_id = event.get('contact_method_id')
         activity_id = event.get('activity_id')
         platform = flow_input['platform']
         
@@ -70,6 +71,8 @@ def lambda_handler(event, context):
         response_data = {
             'action': 'spam_handled',
             'activity_id': activity_id,
+            'lead_id': lead_id,
+            'contact_method_id': contact_method_id,
             'response_message': response_message,
             'action_type': action_type,
             'is_blocked': is_blocked,

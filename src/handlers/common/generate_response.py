@@ -108,6 +108,8 @@ def lambda_handler(event, context):
         response_data = {
             'action': 'message_processed',
             'activity_id': activity_id,
+            'lead_id': lead_id,
+            'contact_method_id': contact_method_id,
             'ai_response': ai_responses,
             'conversation_history_count': len(conversation_history),
             'flow_input': flow_input,
