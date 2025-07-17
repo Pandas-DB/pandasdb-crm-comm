@@ -49,6 +49,7 @@ provider:
         - Effect: Allow
           Action:
             - s3:GetObject
+            - s3:PutObject
           Resource: 
             - !Join ['', [!GetAtt KnowledgeBaseBucket.Arn, '/*']]
         - Effect: Allow

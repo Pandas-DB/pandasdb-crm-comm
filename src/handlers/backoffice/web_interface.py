@@ -239,8 +239,7 @@ def save_system_prompt_to_s3(content):
 def render_base_page(title, content, current_page='dashboard', base_url='/dev/backoffice'):
     """Render base page template with navigation"""
     nav_items = [
-       ('dashboard', 'Dashboard', f'{base_url}'),
-       ('analytics', 'Analytics', f'{base_url}?page=analytics'),
+       ('analytics', 'Analytics', f'{base_url}'),
        ('leads', 'Leads', f'{base_url}?page=leads'),
        ('spam', 'Spam Activities', f'{base_url}?page=spam'),
        ('spam_users', 'Spam Users', f'{base_url}?page=spam_users'),
@@ -350,15 +349,6 @@ def render_login_page(error=None):
     </body>
     </html>
     """
-
-def render_dashboard(admin_api_key, base_url):
-    """Render the main dashboard"""
-    content = """
-    <h2>Welcome to CRM Backoffice</h2>
-    <p>Use the navigation above to access different sections of the admin panel.</p>
-    <p>All data is securely fetched from your admin API using server-side authentication.</p>
-    """
-    return render_base_page("Dashboard", content, "dashboard", base_url)
 
 def render_analytics_page(admin_api_key, base_url, start_date=None, end_date=None):
     """Render analytics page with real data and date filtering"""
@@ -587,92 +577,212 @@ def render_leads_page(admin_api_key, base_url, search_query=None):
     
     return render_base_page("Leads", content, "leads", base_url)
 
-def render_spam_activities_page(admin_api_key, base_url):
-    """Render spam activities page"""
-    data = make_admin_api_call('/spam', admin_api_key)
+def render_spam_activities_page(admin_api_key, base_url, search_query=None, start_date=None, end_date=None):
+    """Render spam activities page with search and date filtering"""
+    
+    # Set default date range to last 30 days if not provided
+    if not start_date or not end_date:
+        end_date = datetime.utcnow().strftime('%Y-%m-%d')
+        start_date = (datetime.utcnow() - timedelta(days=30)).strftime('%Y-%m-%d')
+    
+    # Build API endpoint with search and date parameters
+    endpoint = '/spam'
+    params = []
+    if search_query:
+        params.append(f'search={urllib.parse.quote(search_query)}')
+    if start_date:
+        params.append(f'start_date={start_date}')
+    if end_date:
+        params.append(f'end_date={end_date}')
+    
+    if params:
+        endpoint += '?' + '&'.join(params)
+    
+    data = make_admin_api_call(endpoint, admin_api_key)
     
     if 'error' in data:
         content = f'<div class="error">Error loading spam activities: {data["error"]}</div>'
-    elif isinstance(data, list) and data:
-        table_rows = []
-        for spam in data:
-            spam_date = datetime.fromisoformat(spam.get('spam_date', '').replace('Z', '+00:00')).strftime('%Y-%m-%d %H:%M')
-            message_preview = (spam.get('message', '')[:50] + '...') if len(spam.get('message', '')) > 50 else spam.get('message', '')
-            table_rows.append(f"""
-            <tr>
-                <td>{spam_date}</td>
-                <td>{spam.get('lead_name', 'Unknown')}</td>
-                <td>{spam.get('phone', 'N/A')}</td>
-                <td title="{spam.get('message', '')}">{message_preview}</td>
-                <td>{spam.get('spam_reason', 'N/A')}</td>
-            </tr>
-            """)
-        
-        table_html = f"""
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Lead</th>
-                    <th>Phone</th>
-                    <th>Message</th>
-                    <th>Reason</th>
-                </tr>
-            </thead>
-            <tbody>
-                {''.join(table_rows)}
-            </tbody>
-        </table>
-        """
-        content = f"<h2>Recent Spam Activities</h2>{table_html}"
     else:
-        content = "<h2>Recent Spam Activities</h2><p>No spam activities found.</p>"
+        spam_activities = data.get('spam_activities', [])
+        
+        # Search and filter bar
+        search_value = search_query if search_query else ''
+        filter_bar_html = f"""
+        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <form method="GET" action="{base_url}" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <input type="hidden" name="page" value="spam">
+                
+                <!-- Search Input -->
+                <div style="flex: 1; min-width: 200px;">
+                    <label for="search" style="margin-right: 10px; font-weight: 500;">Search:</label>
+                    <input type="text" id="search" name="search" value="{search_value}" 
+                           placeholder="Search by lead, phone, message..."
+                           style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                </div>
+                
+                <!-- Date Range -->
+                <div>
+                    <label for="start_date" style="margin-right: 5px; font-weight: 500;">From:</label>
+                    <input type="date" id="start_date" name="start_date" value="{start_date}" 
+                           min="{(datetime.utcnow() - timedelta(days=365)).strftime('%Y-%m-%d')}" 
+                           max="{datetime.utcnow().strftime('%Y-%m-%d')}"
+                           style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                </div>
+                <div>
+                    <label for="end_date" style="margin-right: 5px; font-weight: 500;">To:</label>
+                    <input type="date" id="end_date" name="end_date" value="{end_date}"
+                           min="{(datetime.utcnow() - timedelta(days=365)).strftime('%Y-%m-%d')}" 
+                           max="{datetime.utcnow().strftime('%Y-%m-%d')}"
+                           style="padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                </div>
+                
+                <!-- Action Buttons -->
+                <button type="submit" class="btn">Apply Filter</button>
+                <a href="{base_url}?page=spam" class="btn" style="background: #6b7280; text-decoration: none;">Reset (30 days)</a>
+            </form>
+        </div>
+        """
+        
+        if spam_activities:
+            table_rows = []
+            for spam in spam_activities:
+                spam_date = datetime.fromisoformat(spam.get('spam_date', '').replace('Z', '+00:00')).strftime('%Y-%m-%d %H:%M')
+                message_preview = (spam.get('message', '')[:50] + '...') if len(spam.get('message', '')) > 50 else spam.get('message', '')
+                full_message = spam.get('full_message', spam.get('message', ''))
+                table_rows.append(f"""
+                <tr>
+                    <td>{spam_date}</td>
+                    <td>{spam.get('lead_name', 'Unknown')}</td>
+                    <td>{spam.get('phone', 'N/A')}</td>
+                    <td title="{full_message}">{message_preview}</td>
+                    <td>{spam.get('spam_reason', 'N/A')}</td>
+                </tr>
+                """)
+            
+            table_html = f"""
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Lead</th>
+                        <th>Phone</th>
+                        <th>Message</th>
+                        <th>Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join(table_rows)}
+                </tbody>
+            </table>
+            """
+            
+            # Show results count and filter info
+            results_info = f"<p style='margin-bottom: 15px; color: #6b7280;'>Found {len(spam_activities)} spam activit{'y' if len(spam_activities) == 1 else 'ies'}"
+            if search_query:
+                results_info += f" matching \"{search_query}\""
+            results_info += f" from {start_date} to {end_date}</p>"
+            
+            content = f"""
+            <h2>Spam Activities</h2>
+            {filter_bar_html}
+            {results_info}
+            {table_html}
+            """
+        else:
+            search_text = f" matching \"{search_query}\"" if search_query else ""
+            date_text = f" from {start_date} to {end_date}"
+            content = f"""
+            <h2>Spam Activities</h2>
+            {filter_bar_html}
+            <p>No spam activities found{search_text}{date_text}.</p>
+            """
     
     return render_base_page("Spam Activities", content, "spam", base_url)
 
-def render_spam_users_page(admin_api_key, base_url):
-    """Render spam users page"""
-    data = make_admin_api_call('/spam/users', admin_api_key)
+def render_spam_users_page(admin_api_key, base_url, search_query=None):
+    """Render spam users page with search functionality"""
+    
+    # Build API endpoint with search parameter
+    endpoint = '/spam/users'
+    if search_query:
+        endpoint += f'?search={urllib.parse.quote(search_query)}'
+    
+    data = make_admin_api_call(endpoint, admin_api_key)
     
     if 'error' in data:
         content = f'<div class="error">Error loading spam users: {data["error"]}</div>'
-    elif isinstance(data, list) and data:
-        table_rows = []
-        for user in data:
-            first_spam = datetime.fromisoformat(user.get('first_spam', '').replace('Z', '+00:00')).strftime('%Y-%m-%d')
-            last_spam = datetime.fromisoformat(user.get('last_spam', '').replace('Z', '+00:00')).strftime('%Y-%m-%d')
-            status = '🚫 Blocked' if user.get('is_blocked') else '⚠️ Monitored'
-            table_rows.append(f"""
-            <tr>
-                <td>{user.get('lead_name', 'Unknown')}</td>
-                <td>{user.get('phone', 'N/A')}</td>
-                <td>{user.get('spam_count_30_days', 0)}</td>
-                <td>{first_spam}</td>
-                <td>{last_spam}</td>
-                <td>{status}</td>
-            </tr>
-            """)
-        
-        table_html = f"""
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Lead</th>
-                    <th>Phone</th>
-                    <th>Spam Count (30d)</th>
-                    <th>First Spam</th>
-                    <th>Last Spam</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {''.join(table_rows)}
-            </tbody>
-        </table>
-        """
-        content = f"<h2>Spam Users</h2>{table_html}"
     else:
-        content = "<h2>Spam Users</h2><p>No spam users found.</p>"
+        spam_users = data.get('spam_users', [])
+        
+        # Search bar
+        search_value = search_query if search_query else ''
+        search_bar_html = f"""
+        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <form method="GET" action="{base_url}" style="display: flex; align-items: center; gap: 15px;">
+                <input type="hidden" name="page" value="spam_users">
+                <div style="flex: 1;">
+                    <label for="search" style="margin-right: 10px; font-weight: 500;">Search:</label>
+                    <input type="text" id="search" name="search" value="{search_value}" 
+                           placeholder="Search by name or phone number..."
+                           style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                </div>
+                <button type="submit" class="btn">Search</button>
+                <a href="{base_url}?page=spam_users" class="btn" style="background: #6b7280; text-decoration: none;">Clear</a>
+            </form>
+        </div>
+        """
+        
+        if spam_users:
+            table_rows = []
+            for user in spam_users:
+                first_spam = datetime.fromisoformat(user.get('first_spam', '').replace('Z', '+00:00')).strftime('%Y-%m-%d')
+                last_spam = datetime.fromisoformat(user.get('last_spam', '').replace('Z', '+00:00')).strftime('%Y-%m-%d')
+                status = '🚫 Blocked' if user.get('is_blocked') else '⚠️ Monitored'
+                table_rows.append(f"""
+                <tr>
+                    <td>{user.get('lead_name', 'Unknown')}</td>
+                    <td>{user.get('phone', 'N/A')}</td>
+                    <td>{user.get('spam_count_30_days', 0)}</td>
+                    <td>{first_spam}</td>
+                    <td>{last_spam}</td>
+                    <td>{status}</td>
+                </tr>
+                """)
+            
+            table_html = f"""
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Lead</th>
+                        <th>Phone</th>
+                        <th>Spam Count (30d)</th>
+                        <th>First Spam</th>
+                        <th>Last Spam</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join(table_rows)}
+                </tbody>
+            </table>
+            """
+            
+            # Show search results count
+            results_info = f"<p style='margin-bottom: 15px; color: #6b7280;'>Found {len(spam_users)} spam user(s)" + (f" matching \"{search_query}\"" if search_query else "") + "</p>"
+            
+            content = f"""
+            <h2>Spam Users</h2>
+            {search_bar_html}
+            {results_info}
+            {table_html}
+            """
+        else:
+            search_text = f" matching \"{search_query}\"" if search_query else ""
+            content = f"""
+            <h2>Spam Users</h2>
+            {search_bar_html}
+            <p>No spam users found{search_text}.</p>
+            """
     
     return render_base_page("Spam Users", content, "spam_users", base_url)
 
@@ -1281,7 +1391,7 @@ def lambda_handler(event, context):
             return create_response(200, render_login_page("Session expired"))
         
         # Route to different pages
-        page = query_params.get('page', 'dashboard')
+        page = query_params.get('page', 'analytics')
         
         # Handle POST requests for forms
         if http_method == 'POST':
@@ -1343,9 +1453,13 @@ def lambda_handler(event, context):
             search_query = query_params.get('search')
             return create_response(200, render_leads_page(admin_api_key, base_url, search_query))
         elif page == 'spam':
-            return create_response(200, render_spam_activities_page(admin_api_key, base_url))
+            search_query = query_params.get('search')
+            start_date = query_params.get('start_date')
+            end_date = query_params.get('end_date')
+            return create_response(200, render_spam_activities_page(admin_api_key, base_url, search_query, start_date, end_date))
         elif page == 'spam_users':
-            return create_response(200, render_spam_users_page(admin_api_key, base_url))
+            search_query = query_params.get('search')
+            return create_response(200, render_spam_users_page(admin_api_key, base_url, search_query))
         elif page == 'lead_detail':
             lead_id = query_params.get('id')
             if lead_id:
@@ -1360,10 +1474,14 @@ def lambda_handler(event, context):
             return create_response(200, render_integration_page(admin_api_key, base_url))
         elif page == 'system_prompt':
             return create_response(200, render_system_prompt_page(base_url))
-        elif page == 'dashboard' or page == '':
-            return create_response(200, render_dashboard(admin_api_key, base_url))
+        elif page == 'analytics' or page == '':
+            start_date = query_params.get('start_date')
+            end_date = query_params.get('end_date')
+            return create_response(200, render_analytics_page(admin_api_key, base_url, start_date, end_date))
         else:
-            return create_response(200, render_dashboard(admin_api_key, base_url))
+            start_date = query_params.get('start_date')
+            end_date = query_params.get('end_date')
+            return create_response(200, render_analytics_page(admin_api_key, base_url, start_date, end_date))
     
     except Exception as e:
         logger.error(f"Error in backoffice handler: {str(e)}")
