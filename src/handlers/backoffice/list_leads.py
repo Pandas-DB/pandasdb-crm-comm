@@ -3,6 +3,7 @@ import boto3
 import os
 import json
 from decimal import Decimal
+from datetime import datetime, timedelta
 from botocore.exceptions import ClientError
 import urllib.parse
 
@@ -31,6 +32,59 @@ def convert_decimals(obj):
         return float(obj)
     else:
         return obj
+
+def get_last_activity_date(activities_table, lead_id):
+    """Get the last activity date for a lead"""
+    try:
+        response = activities_table.query(
+            IndexName='lead-id-created-at-index',
+            KeyConditionExpression='lead_id = :lead_id',
+            ExpressionAttributeValues={':lead_id': lead_id},
+            ScanIndexForward=False,  # Get most recent first
+            Limit=1,
+            ProjectionExpression='created_at'
+        )
+        
+        if response['Items']:
+            return response['Items'][0]['created_at']
+        return None
+    except Exception as e:
+        logger.warning(f"Error getting last activity for lead {lead_id}: {str(e)}")
+        return None
+
+def filter_leads_by_dates(leads, created_start, created_end, last_activity_start, last_activity_end, activities_table):
+    """Filter leads by creation date and last activity date"""
+    filtered_leads = []
+    
+    for lead in leads:
+        # Filter by creation date
+        if created_start or created_end:
+            lead_created = lead.get('created_at', '')
+            if lead_created:
+                lead_date = lead_created[:10]  # Get YYYY-MM-DD part
+                
+                if created_start and lead_date < created_start:
+                    continue
+                if created_end and lead_date > created_end:
+                    continue
+        
+        # Filter by last activity date (if specified)
+        if last_activity_start or last_activity_end:
+            last_activity = get_last_activity_date(activities_table, lead['id'])
+            if last_activity:
+                activity_date = last_activity[:10]  # Get YYYY-MM-DD part
+                
+                if last_activity_start and activity_date < last_activity_start:
+                    continue
+                if last_activity_end and activity_date > last_activity_end:
+                    continue
+            else:
+                # If no activities found and we're filtering by activity date, exclude this lead
+                continue
+        
+        filtered_leads.append(lead)
+    
+    return filtered_leads
 
 def search_leads_by_name_and_contact(leads_table, contact_methods_table, search_query):
     """Search leads by name or contact method"""
@@ -92,7 +146,7 @@ def search_leads_by_name_and_contact(leads_table, contact_methods_table, search_
     return matching_leads
 
 def lambda_handler(event, context):
-    """List all leads with pagination and search functionality"""
+    """List all leads with pagination, search, and date filtering functionality"""
     
     # Handle OPTIONS request for CORS
     if event.get('httpMethod') == 'OPTIONS':
@@ -104,6 +158,12 @@ def lambda_handler(event, context):
         last_key = query_params.get('last_key')
         search_query = query_params.get('search')
         
+        # New date filter parameters
+        created_start = query_params.get('created_start')
+        created_end = query_params.get('created_end')
+        last_activity_start = query_params.get('last_activity_start')
+        last_activity_end = query_params.get('last_activity_end')
+        
         # URL decode search query
         if search_query:
             search_query = urllib.parse.unquote(search_query).strip()
@@ -111,27 +171,37 @@ def lambda_handler(event, context):
         dynamodb = boto3.resource('dynamodb')
         leads_table = dynamodb.Table(os.environ['LEADS_TABLE'])
         contact_methods_table = dynamodb.Table(os.environ['CONTACT_METHODS_TABLE'])
+        activities_table = dynamodb.Table(os.environ['ACTIVITIES_TABLE'])
         
         # If search query is provided, search across leads and contact methods
         if search_query:
             logger.info(f"Searching for: {search_query}")
             leads = search_leads_by_name_and_contact(leads_table, contact_methods_table, search_query)
-            
-            # Sort by name for consistent results
-            leads.sort(key=lambda x: x.get('name', '').lower())
-            
-            # Apply limit for search results
-            leads = leads[:limit]
         else:
             # Normal pagination scan
-            scan_kwargs = {'Limit': limit}
+            scan_kwargs = {'Limit': limit * 2}  # Get more leads to account for filtering
             if last_key:
                 scan_kwargs['ExclusiveStartKey'] = {'id': last_key}
             
             leads_response = leads_table.scan(**scan_kwargs)
             leads = leads_response['Items']
         
-        # Get contact methods for each lead
+        # Apply date filters if any are specified
+        if created_start or created_end or last_activity_start or last_activity_end:
+            logger.info(f"Applying date filters: created_start={created_start}, created_end={created_end}, last_activity_start={last_activity_start}, last_activity_end={last_activity_end}")
+            leads = filter_leads_by_dates(leads, created_start, created_end, last_activity_start, last_activity_end, activities_table)
+        
+        # Sort by creation date (most recent first) if not searching
+        if not search_query:
+            leads.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        else:
+            # Sort by name for consistent search results
+            leads.sort(key=lambda x: x.get('name', '').lower())
+        
+        # Apply limit after filtering
+        leads = leads[:limit]
+        
+        # Get contact methods and last activity for each lead
         enriched_leads = []
         for lead in leads:
             try:
@@ -141,29 +211,43 @@ def lambda_handler(event, context):
                     ExpressionAttributeValues={':lead_id': lead['id']}
                 )
                 
+                # Get last activity date
+                last_activity = get_last_activity_date(activities_table, lead['id'])
+                
                 lead_data = dict(lead)
                 lead_data['contact_methods'] = contact_response['Items']
+                lead_data['last_activity_date'] = last_activity
                 enriched_leads.append(lead_data)
             except Exception as e:
                 logger.warning(f"Error getting contact methods for lead {lead['id']}: {str(e)}")
                 # Include lead without contact methods if there's an error
                 lead_data = dict(lead)
                 lead_data['contact_methods'] = []
+                lead_data['last_activity_date'] = None
                 enriched_leads.append(lead_data)
         
-        # For search results, don't include pagination info
+        # Build result
+        result = {
+            'leads': convert_decimals(enriched_leads),
+            'count': len(enriched_leads)
+        }
+        
+        # Add search query to result if present
         if search_query:
-            result = {
-                'leads': convert_decimals(enriched_leads),
-                'count': len(enriched_leads),
-                'search_query': search_query
+            result['search_query'] = search_query
+        
+        # Add date filters to result if present
+        if created_start or created_end or last_activity_start or last_activity_end:
+            result['filters'] = {
+                'created_start': created_start,
+                'created_end': created_end,
+                'last_activity_start': last_activity_start,
+                'last_activity_end': last_activity_end
             }
-        else:
-            result = {
-                'leads': convert_decimals(enriched_leads),
-                'count': len(enriched_leads),
-                'last_key': leads_response.get('LastEvaluatedKey', {}).get('id') if 'LastEvaluatedKey' in leads_response else None
-            }
+        
+        # Add pagination info only for non-search, non-filtered results
+        if not search_query and not (created_start or created_end or last_activity_start or last_activity_end):
+            result['last_key'] = leads_response.get('LastEvaluatedKey', {}).get('id') if 'LastEvaluatedKey' in leads_response else None
         
         logger.info(f"Returning {len(enriched_leads)} leads")
         return create_response(200, result)

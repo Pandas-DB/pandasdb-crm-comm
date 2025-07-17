@@ -493,13 +493,26 @@ def render_analytics_page(admin_api_key, base_url, start_date=None, end_date=Non
     
     return render_base_page("Analytics", content, "analytics", base_url)
 
-def render_leads_page(admin_api_key, base_url, search_query=None):
-    """Render leads management page with search functionality"""
+def render_leads_page(admin_api_key, base_url, search_query=None, created_start=None, created_end=None, last_activity_start=None, last_activity_end=None):
+    """Render leads management page with search and date filtering functionality"""
     
-    # Build API endpoint with search parameter
+    # Build API endpoint with all parameters
     endpoint = '/leads'
+    params = []
+    
     if search_query:
-        endpoint += f'?search={urllib.parse.quote(search_query)}'
+        params.append(f'search={urllib.parse.quote(search_query)}')
+    if created_start:
+        params.append(f'created_start={created_start}')
+    if created_end:
+        params.append(f'created_end={created_end}')
+    if last_activity_start:
+        params.append(f'last_activity_start={last_activity_start}')
+    if last_activity_end:
+        params.append(f'last_activity_end={last_activity_end}')
+    
+    if params:
+        endpoint += '?' + '&'.join(params)
     
     data = make_admin_api_call(endpoint, admin_api_key)
     
@@ -508,20 +521,72 @@ def render_leads_page(admin_api_key, base_url, search_query=None):
     else:
         leads = data.get('leads', [])
         
-        # Search bar
+        # Search and filter bar with date ranges
         search_value = search_query if search_query else ''
-        search_bar_html = f"""
+        created_start_value = created_start if created_start else ''
+        created_end_value = created_end if created_end else ''
+        last_activity_start_value = last_activity_start if last_activity_start else ''
+        last_activity_end_value = last_activity_end if last_activity_end else ''
+        
+        # Calculate default date ranges for placeholders
+        today = datetime.utcnow().strftime('%Y-%m-%d')
+        thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).strftime('%Y-%m-%d')
+        
+        filter_bar_html = f"""
         <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-            <form method="GET" action="{base_url}" style="display: flex; align-items: center; gap: 15px;">
+            <form method="GET" action="{base_url}" style="display: flex; flex-direction: column; gap: 15px;">
                 <input type="hidden" name="page" value="leads">
-                <div style="flex: 1;">
-                    <label for="search" style="margin-right: 10px; font-weight: 500;">Search:</label>
-                    <input type="text" id="search" name="search" value="{search_value}" 
-                           placeholder="Search by name or contact method..."
-                           style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                
+                <!-- Search Input -->
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 250px;">
+                        <label for="search" style="margin-right: 10px; font-weight: 500;">Search:</label>
+                        <input type="text" id="search" name="search" value="{search_value}" 
+                               placeholder="Search by name or contact method..."
+                               style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;">
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <button type="submit" class="btn">Apply Filters</button>
+                    <a href="{base_url}?page=leads" class="btn" style="background: #6b7280; text-decoration: none;">Clear All</a>
                 </div>
-                <button type="submit" class="btn">Search</button>
-                <a href="{base_url}?page=leads" class="btn" style="background: #6b7280; text-decoration: none;">Clear</a>
+                
+                <!-- Date Filters -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <!-- Creation Date Range -->
+                    <div style="background: white; padding: 15px; border-radius: 6px; border: 1px solid #e5e7eb;">
+                        <h4 style="margin: 0 0 10px 0; color: #374151;">Filter by Creation Date</h4>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="flex: 1;">
+                                <label for="created_start" style="display: block; margin-bottom: 5px; font-size: 12px; color: #6b7280;">From:</label>
+                                <input type="date" id="created_start" name="created_start" value="{created_start_value}"
+                                       style="width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px;">
+                            </div>
+                            <div style="flex: 1;">
+                                <label for="created_end" style="display: block; margin-bottom: 5px; font-size: 12px; color: #6b7280;">To:</label>
+                                <input type="date" id="created_end" name="created_end" value="{created_end_value}"
+                                       style="width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px;">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Last Activity Date Range -->
+                    <div style="background: white; padding: 15px; border-radius: 6px; border: 1px solid #e5e7eb;">
+                        <h4 style="margin: 0 0 10px 0; color: #374151;">Filter by Last Activity</h4>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="flex: 1;">
+                                <label for="last_activity_start" style="display: block; margin-bottom: 5px; font-size: 12px; color: #6b7280;">From:</label>
+                                <input type="date" id="last_activity_start" name="last_activity_start" value="{last_activity_start_value}"
+                                       style="width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px;">
+                            </div>
+                            <div style="flex: 1;">
+                                <label for="last_activity_end" style="display: block; margin-bottom: 5px; font-size: 12px; color: #6b7280;">To:</label>
+                                <input type="date" id="last_activity_end" name="last_activity_end" value="{last_activity_end_value}"
+                                       style="width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </form>
         </div>
         """
@@ -531,11 +596,20 @@ def render_leads_page(admin_api_key, base_url, search_query=None):
             for lead in leads:
                 contact_methods = '<br>'.join([f"{cm.get('type', '')}: {cm.get('value', '')}" for cm in lead.get('contact_methods', [])])
                 created_date = datetime.fromisoformat(lead.get('created_at', '').replace('Z', '+00:00')).strftime('%Y-%m-%d %H:%M')
+                
+                # Format last activity date
+                last_activity = lead.get('last_activity_date')
+                if last_activity:
+                    last_activity_formatted = datetime.fromisoformat(last_activity.replace('Z', '+00:00')).strftime('%Y-%m-%d %H:%M')
+                else:
+                    last_activity_formatted = 'No activity'
+                
                 table_rows.append(f"""
                 <tr>
                     <td>{lead.get('name', 'Unknown')}</td>
                     <td>{contact_methods}</td>
                     <td>{created_date}</td>
+                    <td>{last_activity_formatted}</td>
                     <td>
                         <a href="{base_url}?page=lead_detail&id={lead.get('id', '')}" class="btn btn-small">View Details</a>
                     </td>
@@ -549,6 +623,7 @@ def render_leads_page(admin_api_key, base_url, search_query=None):
                         <th>Name</th>
                         <th>Contact Methods</th>
                         <th>Created</th>
+                        <th>Last Activity</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -558,10 +633,46 @@ def render_leads_page(admin_api_key, base_url, search_query=None):
             </table>
             """
             
-            # Show search results count
-            results_info = f"<p style='margin-bottom: 15px; color: #6b7280;'>Found {len(leads)} lead(s)" + (f" matching \"{search_query}\"" if search_query else "") + "</p>"
+            # Show results count and active filters
+            results_info = f"<p style='margin-bottom: 15px; color: #6b7280;'>Found {len(leads)} lead(s)"
+            
+            # Add active filter info
+            active_filters = []
+            if search_query:
+                active_filters.append(f'matching "{search_query}"')
+            if created_start and created_end:
+                active_filters.append(f'created between {created_start} and {created_end}')
+            elif created_start:
+                active_filters.append(f'created after {created_start}')
+            elif created_end:
+                active_filters.append(f'created before {created_end}')
+            if last_activity_start and last_activity_end:
+                active_filters.append(f'last activity between {last_activity_start} and {last_activity_end}')
+            elif last_activity_start:
+                active_filters.append(f'last activity after {last_activity_start}')
+            elif last_activity_end:
+                active_filters.append(f'last activity before {last_activity_end}')
+            
+            if active_filters:
+                results_info += f" ({', '.join(active_filters)})"
+            
+            results_info += "</p>"
         else:
-            table_html = f"<p>{'No leads found matching your search.' if search_query else 'No leads found.'}</p>"
+            # Show appropriate message based on active filters
+            active_filters = []
+            if search_query:
+                active_filters.append(f'search "{search_query}"')
+            if created_start or created_end:
+                active_filters.append('creation date filter')
+            if last_activity_start or last_activity_end:
+                active_filters.append('last activity filter')
+            
+            if active_filters:
+                filter_text = f" matching {' and '.join(active_filters)}"
+            else:
+                filter_text = ""
+            
+            table_html = f"<p>No leads found{filter_text}.</p>"
             results_info = ""
         
         content = f"""
@@ -570,7 +681,7 @@ def render_leads_page(admin_api_key, base_url, search_query=None):
             <a href="{base_url}?page=create_lead" class="btn">Create Lead</a>
         </div>
         
-        {search_bar_html}
+        {filter_bar_html}
         {results_info}
         {table_html}
         """
@@ -1613,7 +1724,11 @@ def lambda_handler(event, context):
             return create_response(200, render_analytics_page(admin_api_key, base_url, start_date, end_date))
         elif page == 'leads':
             search_query = query_params.get('search')
-            return create_response(200, render_leads_page(admin_api_key, base_url, search_query))
+            created_start = query_params.get('created_start')
+            created_end = query_params.get('created_end')
+            last_activity_start = query_params.get('last_activity_start')
+            last_activity_end = query_params.get('last_activity_end')
+            return create_response(200, render_leads_page(admin_api_key, base_url, search_query, created_start, created_end, last_activity_start, last_activity_end))
         elif page == 'spam':
             search_query = query_params.get('search')
             start_date = query_params.get('start_date')
