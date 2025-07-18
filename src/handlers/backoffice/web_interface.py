@@ -313,7 +313,7 @@ def render_base_page(title, content, current_page='dashboard', base_url='/dev/ba
     </html>
     """
 
-def render_login_page(error=None):
+def render_login_page(error=None, base_url=None):
     """Render the login page"""
     error_html = f'<div class="error">{error}</div>' if error else ''
     
@@ -338,7 +338,7 @@ def render_login_page(error=None):
         <div class="login-container">
             <h1>CRM Backoffice</h1>
             {error_html}
-            <form method="POST">
+            <form method="POST" action="{base_url}">
                 <div class="form-group">
                     <label for="api_key">Admin API Key:</label>
                     <input type="password" id="api_key" name="api_key" required>
@@ -1693,18 +1693,18 @@ def lambda_handler(event, context):
                         location=base_url
                     )
                 else:
-                    return create_response(200, render_login_page("Session creation failed"))
+                    return create_response(200, render_login_page("Session creation failed", base_url))
             else:
-                return create_response(200, render_login_page("Invalid API key"))
+                return create_response(200, render_login_page("Invalid API key", base_url))
         
         # Check if user is authenticated
         if not session_id or not verify_session(session_id):
-            return create_response(200, render_login_page())
+            return create_response(200, render_login_page(None, base_url))
         
         # Get API key from session
         admin_api_key = get_session_api_key(session_id)
         if not admin_api_key:
-            return create_response(200, render_login_page("Session expired"))
+            return create_response(200, render_login_page("Session expired", base_url))
         
         # Handle special actions
         if query_params.get('action') == 'delete_spam':
