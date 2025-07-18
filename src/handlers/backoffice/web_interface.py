@@ -1204,12 +1204,25 @@ def render_spam_config_page(admin_api_key, base_url):
         # Format spam activities limits for display
         spam_activities_limits = spam_detection.get('spam_activities_limits', [])
         spam_limits_rows = []
-        for i, limit in enumerate(spam_activities_limits):
-            if isinstance(limit, list) and len(limit) >= 2:
-                days, count = limit[0], limit[1]
-                action = limit[2] if len(limit) > 2 else 'warn'
+        
+        # Ensure we have at least one row, and populate existing data
+        max_rows = max(len(spam_activities_limits), 1)
+        for i in range(max_rows):
+            if i < len(spam_activities_limits):
+                limit = spam_activities_limits[i]
+                if isinstance(limit, dict):
+                    days = limit.get('days', '')
+                    count = limit.get('count', '')
+                    action = limit.get('action', 'warn')
+                else:
+                    days = ''
+                    count = ''
+                    action = 'warn'
             else:
-                days, count, action = '', '', 'warn'
+                days = ''
+                count = ''
+                action = 'warn'
+            
             spam_limits_rows.append(f"""
             <tr>
                 <td><input type="number" name="spam_activities_limits_{i}_days" value="{days}" style="width: 80px;"></td>
@@ -1221,12 +1234,25 @@ def render_spam_config_page(admin_api_key, base_url):
         # Format message limits for display
         message_limits = spam_detection.get('message_limits', [])
         message_limits_rows = []
-        for i, limit in enumerate(message_limits):
-            if isinstance(limit, list) and len(limit) >= 2:
-                days, count = limit[0], limit[1]
-                action = limit[2] if len(limit) > 2 else 'warn'
+        
+        # Ensure we have at least 3 rows (as shown in original config), and populate existing data
+        max_rows = max(len(message_limits), 3)
+        for i in range(max_rows):
+            if i < len(message_limits):
+                limit = message_limits[i]
+                if isinstance(limit, dict):
+                    days = limit.get('days', '')
+                    count = limit.get('count', '')
+                    action = limit.get('action', 'warn')
+                else:
+                    days = ''
+                    count = ''
+                    action = 'warn'
             else:
-                days, count, action = '', '', 'warn'
+                days = ''
+                count = ''
+                action = 'warn'
+            
             message_limits_rows.append(f"""
             <tr>
                 <td><input type="number" name="message_limits_{i}_days" value="{days}" style="width: 80px;"></td>
@@ -1318,13 +1344,14 @@ def handle_spam_config_post(admin_api_key, form_data, base_url):
         while f'spam_activities_limits_{i}_days' in form_data:
             days = form_data.get(f'spam_activities_limits_{i}_days')
             count = form_data.get(f'spam_activities_limits_{i}_count')
-            action = form_data.get(f'spam_activities_limits_{i}_action')
+            action = form_data.get(f'spam_activities_limits_{i}_action', 'warn')
             
-            if days and count and action:
+            # Only add if both days and count have values
+            if days and count and days.strip() and count.strip():
                 spam_activities_limits.append({
                     'days': int(days),
                     'count': int(count),
-                    'action': action
+                    'action': action.strip() if action else 'warn'
                 })
             i += 1
         
@@ -1334,13 +1361,14 @@ def handle_spam_config_post(admin_api_key, form_data, base_url):
         while f'message_limits_{i}_days' in form_data:
             days = form_data.get(f'message_limits_{i}_days')
             count = form_data.get(f'message_limits_{i}_count')
-            action = form_data.get(f'message_limits_{i}_action')
+            action = form_data.get(f'message_limits_{i}_action', 'warn')
             
-            if days and count and action:
+            # Only add if both days and count have values
+            if days and count and days.strip() and count.strip():
                 message_limits.append({
                     'days': int(days),
                     'count': int(count),
-                    'action': action
+                    'action': action.strip() if action else 'warn'
                 })
             i += 1
         

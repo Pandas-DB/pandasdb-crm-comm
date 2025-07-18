@@ -20,6 +20,51 @@ def create_response(status_code, body):
         'body': json.dumps(body) if isinstance(body, dict) else body
     }
 
+def normalize_limits_to_list_format(limits):
+    """Convert limits from object format to list format for YAML storage"""
+    if not limits:
+        return []
+    
+    normalized = []
+    for limit in limits:
+        if isinstance(limit, dict):
+            # Convert from object format: {days: 30, count: 5, action: "warn"}
+            # to list format: [30, 5] (action is optional and typically not stored in the original format)
+            days = limit.get('days')
+            count = limit.get('count')
+            if days is not None and count is not None:
+                normalized.append([int(days), int(count)])
+        elif isinstance(limit, list) and len(limit) >= 2:
+            # Already in list format: [30, 5]
+            normalized.append([int(limit[0]), int(limit[1])])
+    
+    return normalized
+
+def normalize_limits_to_object_format(limits):
+    """Convert limits from list format to object format for frontend"""
+    if not limits:
+        return []
+    
+    normalized = []
+    for limit in limits:
+        if isinstance(limit, list) and len(limit) >= 2:
+            # Convert from list format: [30, 5]
+            # to object format: {days: 30, count: 5, action: "warn"}
+            normalized.append({
+                'days': int(limit[0]),
+                'count': int(limit[1]),
+                'action': limit[2] if len(limit) > 2 else 'warn'
+            })
+        elif isinstance(limit, dict):
+            # Already in object format
+            normalized.append({
+                'days': int(limit.get('days', 0)),
+                'count': int(limit.get('count', 0)),
+                'action': limit.get('action', 'warn')
+            })
+    
+    return normalized
+
 def get_config_from_s3():
     """Read configuration from S3"""
     try:
@@ -82,13 +127,23 @@ def lambda_handler(event, context):
                 return create_response(500, {'error': 'Failed to load configuration'})
             
             # Extract relevant settings for frontend
+            spam_detection = config.get('spam_detection', {})
+            
+            # Convert limits to object format for frontend display
+            spam_activities_limits = normalize_limits_to_object_format(
+                spam_detection.get('spam_activities_limits', [])
+            )
+            message_limits = normalize_limits_to_object_format(
+                spam_detection.get('message_limits', [])
+            )
+            
             result = {
                 'spam_detection': {
-                    'spam_activities_limits': config.get('spam_detection', {}).get('spam_activities_limits', []),
-                    'message_limits': config.get('spam_detection', {}).get('message_limits', []),
-                    'warning_threshold_offset': config.get('spam_detection', {}).get('warning_threshold_offset', 5),
-                    'ai_confidence_threshold': config.get('spam_detection', {}).get('ai_confidence_threshold', 0.7),
-                    'fallback_confidence': config.get('spam_detection', {}).get('fallback_confidence', 0.7)
+                    'spam_activities_limits': spam_activities_limits,
+                    'message_limits': message_limits,
+                    'warning_threshold_offset': spam_detection.get('warning_threshold_offset', 5),
+                    'ai_confidence_threshold': spam_detection.get('ai_confidence_threshold', 0.7),
+                    'fallback_confidence': spam_detection.get('fallback_confidence', 0.7)
                 },
                 'spam_messages': {
                     'warning_message_es': config.get('spam_messages', {}).get('warning_message_es', ''),
@@ -140,7 +195,25 @@ def lambda_handler(event, context):
             if 'spam_detection' in updates:
                 if 'spam_detection' not in config:
                     config['spam_detection'] = {}
-                config['spam_detection'].update(updates['spam_detection'])
+                
+                spam_detection_updates = updates['spam_detection']
+                
+                # Handle spam_activities_limits conversion
+                if 'spam_activities_limits' in spam_detection_updates:
+                    config['spam_detection']['spam_activities_limits'] = normalize_limits_to_list_format(
+                        spam_detection_updates['spam_activities_limits']
+                    )
+                
+                # Handle message_limits conversion
+                if 'message_limits' in spam_detection_updates:
+                    config['spam_detection']['message_limits'] = normalize_limits_to_list_format(
+                        spam_detection_updates['message_limits']
+                    )
+                
+                # Handle other spam detection settings
+                for key in ['warning_threshold_offset', 'ai_confidence_threshold', 'fallback_confidence']:
+                    if key in spam_detection_updates:
+                        config['spam_detection'][key] = spam_detection_updates[key]
             
             if 'spam_messages' in updates:
                 if 'spam_messages' not in config:
