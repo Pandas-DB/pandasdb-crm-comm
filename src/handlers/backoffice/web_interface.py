@@ -29,7 +29,7 @@ def get_sessions_table():
             sessions_table = dynamodb.Table(table_name)
     return sessions_table
 
-def create_response(status_code, body, content_type='text/html', set_cookie=None, location=None):
+def create_response(status_code, body, content_type='text/html; charset=utf-8', set_cookie=None, location=None):
     headers = {
         'Content-Type': content_type,
         'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -46,6 +46,7 @@ def create_response(status_code, body, content_type='text/html', set_cookie=None
         'headers': headers,
         'body': body
     }
+
 
 def verify_admin_key(api_key):
     """Verify if the provided API key is valid by testing against admin API"""
@@ -255,8 +256,10 @@ def render_base_page(title, content, current_page='dashboard', base_url='/dev/ba
     
     return f"""
     <!DOCTYPE html>
-    <html>
+    <html lang="es">
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>{title} - CRM Dashboard</title>
         <style>
             body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }}
@@ -319,8 +322,10 @@ def render_login_page(error=None, base_url=None):
     
     return f"""
     <!DOCTYPE html>
-    <html>
+    <html lang="es">
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>CRM Backoffice - Login</title>
         <style>
             body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; margin: 0; padding: 50px 20px; }}
