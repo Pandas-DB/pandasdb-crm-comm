@@ -5,7 +5,7 @@ spam_detection:
   
   # List of [days, max_messages] tuples - user marked as spammer if exceeds limit
   message_limits:
-    - [1, 100]    # 50 messages in 1 day
+    - [1, 50]    # 50 messages in 1 day
     - [7, 200]   # 200 messages in 7 days
     - [30, 600]  # 600 messages in 30 days
   
