@@ -20,6 +20,7 @@ def check_message_limits_spam(activities_table, lead_id, config):
     """
     message_limits = config['spam_detection']['message_limits']
     warning_threshold_offset = config['spam_detection']['warning_threshold_offset']
+    logger.info(f"Check Lead {lead_id}: message limits: {message_limits}")
     
     for days, max_messages in message_limits:
         # Calculate the start date for this period
@@ -54,6 +55,7 @@ def check_spam_activities_limits(spam_activities_table, lead_id, config):
     Returns True if spam detected, False otherwise.
     """
     spam_activities_limits = config['spam_detection']['spam_activities_limits']
+    logger.info(f"Check spam activities limits: Lead {lead_id}: spam activities limits: {spam_activities_limits}")
     
     for days, max_spam_activities in spam_activities_limits:
         # Calculate the start date for this period

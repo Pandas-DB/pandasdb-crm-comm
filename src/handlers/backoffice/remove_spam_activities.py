@@ -95,19 +95,22 @@ def lambda_handler(event, context):
 def remove_specific_spam_activity(spam_activities_table, lead_id, activity_id):
     """Remove a specific spam activity for a lead"""
     try:
-        response = spam_activities_table.scan(
-            FilterExpression='lead_id = :lead_id AND activity_id = :activity_id',
-            ExpressionAttributeValues={
-                ':lead_id': lead_id,
-                ':activity_id': activity_id
-            }
-        )
+        # The activity_id parameter is actually the spam record's own 'id' field
+        # Get the specific spam activity record by its primary key
+        response = spam_activities_table.get_item(Key={'id': activity_id})
         
-        if not response['Items']:
+        if 'Item' not in response:
             return 0
         
-        spam_activity = response['Items'][0]
-        spam_activities_table.delete_item(Key={'id': spam_activity['id']})
+        spam_activity = response['Item']
+        
+        # Verify it belongs to the correct lead
+        if spam_activity.get('lead_id') != lead_id:
+            logger.warning(f"Spam activity {activity_id} does not belong to lead {lead_id}")
+            return 0
+        
+        # Delete the specific spam activity
+        spam_activities_table.delete_item(Key={'id': activity_id})
         
         logger.info(f"Removed specific spam activity {activity_id} for lead {lead_id}")
         return 1

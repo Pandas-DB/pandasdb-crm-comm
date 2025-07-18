@@ -1686,8 +1686,8 @@ def lambda_handler(event, context):
             if not lead_id or not spam_activity_id:
                 return create_response(400, json.dumps({'error': 'Lead ID and Spam Activity ID are required'}), 'application/json')
             
-            # Make API call to delete spam activity
-            result = make_admin_api_call(f'/leads/{lead_id}?spam_activity_id={spam_activity_id}', admin_api_key, 'DELETE')
+            # Make API call to delete spam activity - use the correct admin API endpoint
+            result = make_admin_api_call(f'/leads/{lead_id}?activity_id={spam_activity_id}', admin_api_key, 'DELETE')
             
             return create_response(200, json.dumps(result), 'application/json')
         
